@@ -95,12 +95,26 @@ app.use(`${FUNCTION_PREFIX}/*`, async (c, next) => {
 });
 
 // Health check endpoint
-app.get(`${FUNCTION_PREFIX}/health`, (c) => {
-  return c.json({
-    status: "ok",
-    timestamp: new Date().toISOString(),
-    version: "2.0"
-  });
+app.get(`${FUNCTION_PREFIX}/health`, async (c) => {
+  try {
+    await kv.get("admin:credentials");
+
+    return c.json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      version: "2.0",
+      database: "ok"
+    });
+  } catch (error) {
+    console.error(`Health check database error:`, error);
+    return c.json({
+      status: "error",
+      timestamp: new Date().toISOString(),
+      version: "2.0",
+      database: "unavailable",
+      error: String(error)
+    }, 500);
+  }
 });
 
 // Debug endpoint to check database connection
