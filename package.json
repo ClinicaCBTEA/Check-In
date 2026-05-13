@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
+  "packageManager": "pnpm@10.12.1",
   "scripts": {
     "build": "vite build",
     "dev": "vite",
@@ -75,10 +76,5 @@
     "supabase": "^2.98.2",
     "tailwindcss": "4.1.12",
     "vite": "6.3.5"
-  },
-  "pnpm": {
-    "overrides": {
-      "vite": "6.3.5"
-    }
   }
 }
