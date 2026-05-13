@@ -23,6 +23,11 @@ Voce ainda vai precisar de:
 
 ## Comandos
 
+Observacao:
+
+- o frontend nao depende do pacote `supabase` para build na Vercel
+- o CLI do Supabase e resolvido sob demanda pelos scripts `scripts/supabase.*`
+
 ### 1. Login e link
 
 ```powershell
