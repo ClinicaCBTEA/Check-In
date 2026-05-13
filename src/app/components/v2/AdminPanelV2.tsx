@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '../ui/alert';
 import { Badge } from '../ui/badge';
 import { useUserManagement } from '../../context/UserManagementContext';
 import { Shield, UserPlus, Trash2, LogOut, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import logo from '../../../imports/image.png';
 
 export default function AdminPanelV2() {
   const navigate = useNavigate();
@@ -129,7 +130,7 @@ export default function AdminPanelV2() {
       <div className="max-w-6xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <img src="/src/imports/image.png" alt="CBTEA Logo" className="h-16" />
+            <img src={logo} alt="CBTEA Logo" className="h-16" />
             <div>
               <h1 className="text-4xl font-bold text-gray-800 flex items-center gap-3">
                 <Shield className="w-10 h-10 text-purple-600" />

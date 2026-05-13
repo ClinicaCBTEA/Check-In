@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Alert, AlertDescription } from '../ui/alert';
 import { Shield, AlertCircle, Loader2 } from 'lucide-react';
 import { useUserManagement } from '../../context/UserManagementContext';
+import logo from '../../../imports/image.png';
 
 export default function AdminLoginScreenV2() {
   const [username, setUsername] = useState('');
@@ -49,7 +50,7 @@ export default function AdminLoginScreenV2() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-3 sm:mb-4">
-            <img src="/src/imports/image.png" alt="CBTEA Logo" className="h-12 sm:h-16" />
+            <img src={logo} alt="CBTEA Logo" className="h-12 sm:h-16" />
           </div>
           <div className="flex justify-center mb-3 sm:mb-4">
             <div className="w-12 h-12 sm:w-16 sm:h-16 bg-purple-200 rounded-full flex items-center justify-center">

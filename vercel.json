@@ -1,5 +1,14 @@
 {
   "installCommand": "pnpm install --no-frozen-lockfile",
   "buildCommand": "pnpm build",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/qrcode", "destination": "/index.html" },
+    { "source": "/fila", "destination": "/index.html" },
+    { "source": "/login", "destination": "/index.html" },
+    { "source": "/recepcao", "destination": "/index.html" },
+    { "source": "/log", "destination": "/index.html" },
+    { "source": "/admin", "destination": "/index.html" },
+    { "source": "/admin/:path*", "destination": "/index.html" }
+  ]
 }

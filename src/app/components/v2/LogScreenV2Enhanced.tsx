@@ -9,6 +9,7 @@ import { ArrowLeft, Clock, Bell, Phone, Download, Calendar } from 'lucide-react'
 import { useNavigate } from 'react-router';
 import ProtectedRoute from './ProtectedRoute';
 import * as XLSX from 'xlsx';
+import logo from '../../../imports/image.png';
 
 function LogScreenEnhancedContent() {
   const { getLogEntries } = useSimpleQueue();
@@ -101,7 +102,7 @@ function LogScreenEnhancedContent() {
           <Button variant="outline" size="icon" onClick={() => navigate('/recepcao')}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <img src="/src/imports/image.png" alt="CBTEA Logo" className="h-14" />
+          <img src={logo} alt="CBTEA Logo" className="h-14" />
           <div className="flex-1">
             <h1 className="text-4xl font-bold text-gray-800">Log de Atendimentos</h1>
             <p className="text-gray-600 mt-1">Registro de check-in e chamadas</p>

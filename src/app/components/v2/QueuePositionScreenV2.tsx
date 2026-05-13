@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { useSimpleQueue } from '../../context/SimpleQueueContext';
 import { Clock, Users, Bell, CheckCircle, RotateCcw, BellRing } from 'lucide-react';
 import { requestNotificationPermission, showNotification, playNotificationSound, isNotificationSupported, getNotificationPermission } from '../../../utils/notifications';
+import logo from '../../../imports/image.png';
 
 export default function QueuePositionScreenV2() {
   const location = useLocation();
@@ -63,8 +64,8 @@ export default function QueuePositionScreenV2() {
       if (notificationPermission === 'granted') {
         showNotification('🔔 É a sua vez!', {
           body: 'Por favor, dirija-se ao atendimento agora.',
-          icon: '/src/imports/image.png',
-          badge: '/src/imports/image.png',
+          icon: logo,
+          badge: logo,
           tag: 'queue-notification',
           requireInteraction: true,
           vibrate: [200, 100, 200],
@@ -134,7 +135,7 @@ export default function QueuePositionScreenV2() {
       {/* Header com Logo */}
       <div className="bg-white shadow-sm border-b py-3 sm:py-4 px-4">
         <div className="max-w-2xl mx-auto flex justify-center">
-          <img src="/src/imports/image.png" alt="CBTEA Logo" className="h-10 sm:h-12" />
+          <img src={logo} alt="CBTEA Logo" className="h-10 sm:h-12" />
         </div>
       </div>
 

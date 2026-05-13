@@ -3,13 +3,16 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { useState, useEffect } from 'react';
+import logo from '../../../imports/image.png';
 
 export default function QrCodeScreenV2() {
   const navigate = useNavigate();
   const [qrSize, setQrSize] = useState(224);
 
-  // URL do projeto publicado no Figma Make
-  const qrCodeUrl = 'https://forum-zone-63638029.figma.site/';
+  const appBaseUrl =
+    import.meta.env.VITE_PUBLIC_APP_URL?.replace(/\/$/, '') ||
+    window.location.origin;
+  const qrCodeUrl = `${appBaseUrl}/`;
 
   useEffect(() => {
     const updateSize = () => {
@@ -36,7 +39,7 @@ export default function QrCodeScreenV2() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-3 sm:mb-4">
-            <img src="/src/imports/image.png" alt="CBTEA Logo" className="h-12 sm:h-16" />
+            <img src={logo} alt="CBTEA Logo" className="h-12 sm:h-16" />
           </div>
           <CardTitle className="text-xl sm:text-2xl">Bem-vindo</CardTitle>
           <CardDescription className="text-sm sm:text-base">Escaneie o QR Code para se cadastrar na fila</CardDescription>

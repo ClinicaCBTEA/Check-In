@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Bell, Clock, Users, Phone, ChevronUp, LogOut, RotateCcw, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import ProtectedRoute from './ProtectedRoute';
+import logo from '../../../imports/image.png';
 
 function ReceptionScreenContent() {
   const { queue, currentPatient, callNext, callSpecificPatient, completeService, returnToQueue, moveToFront } = useSimpleQueue();
@@ -48,7 +49,7 @@ function ReceptionScreenContent() {
       <div className="max-w-6xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <img src="/src/imports/image.png" alt="CBTEA Logo" className="h-16" />
+            <img src={logo} alt="CBTEA Logo" className="h-16" />
             <div>
               <h1 className="text-4xl font-bold text-gray-800">Painel da Recepção</h1>
               <p className="text-gray-600 mt-2">Gerenciamento de chamadas</p>
