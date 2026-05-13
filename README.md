@@ -137,8 +137,8 @@ A aplicação estará disponível em `http://localhost:5173`
 ├── supabase/
 │   └── functions/
 │       └── server/              # Edge Function (Backend)
-│           ├── index.tsx        # Servidor Hono com todas as rotas
-│           └── kv_store.tsx     # Utilitários de KV store
+│           ├── index.ts         # Servidor Hono com todas as rotas
+│           └── kv_store.ts      # Utilitários de KV store
 ├── NOTIFICATIONS_GUIDE.md       # Guia de notificações
 └── DEPLOY.md                    # Guia de deploy
 ```
