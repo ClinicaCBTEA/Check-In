@@ -1,0 +1,2 @@
+-- Dados iniciais sao criados automaticamente pela Edge Function.
+-- Este arquivo existe para manter o fluxo do Supabase CLI consistente.
