@@ -179,10 +179,7 @@ export default function RegisterScreenV2() {
                 <span className="text-sm sm:text-base">Entrar na Fila</span>
               )}
             </Button>
-            <\div>
-            <div className="text-center text-xs sm:text-sm text-gray-500 mt-4">
-              <p>não feche o seu navegador, até concluir o atendimento!</p>
-          </div>
+            <div className="text-center text-xs sm:text-sm text-gray-500 mt-4"> <p>Não feche o seu navegador, até concluir o atendimento!</p></div>
           </form>
         </CardContent>
       </Card>
