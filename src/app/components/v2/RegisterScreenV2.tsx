@@ -145,6 +145,7 @@ export default function RegisterScreenV2() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
+              <Label htmlFor="aviso">Não feche o seu navegador até finalizar o atendimento!</Label>
               <Label htmlFor="name">Nome do Paciente</Label>
               <Input
                 id="name"
