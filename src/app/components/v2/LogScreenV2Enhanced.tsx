@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -10,7 +10,6 @@ import { useUserManagement } from '../../context/UserManagementContext';
 import { ArrowLeft, Clock, Bell, Phone, Download, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import ProtectedRoute from './ProtectedRoute';
-import * as XLSX from 'xlsx';
 import logo from '../../../imports/image.png';
 
 function LogScreenEnhancedContent() {
@@ -19,32 +18,45 @@ function LogScreenEnhancedContent() {
   const { units } = useUserManagement();
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split('T')[0]
+    new Date().toISOString().split('T')[0],
   );
+  const [selectedUnitId, setSelectedUnitId] = useState('');
 
-  const unitLabel = (id: string) => units.find((u) => u.id === id)?.name || id;
+  const allowedUnits = useMemo(() => {
+    if (!receptionist?.unitIds?.length) {
+      return [];
+    }
+
+    return units.filter((unit) => receptionist.unitIds.includes(unit.id));
+  }, [receptionist?.unitIds, units]);
+
+  useEffect(() => {
+    if (!selectedUnitId && allowedUnits.length > 0) {
+      setSelectedUnitId(allowedUnits[0].id);
+    }
+  }, [allowedUnits, selectedUnitId]);
+
+  const unitLabel = (id: string) => units.find((unit) => unit.id === id)?.name || id;
 
   const allEntries = getLogEntries();
-  const allowedUnitIds = receptionist?.unitIds;
-
-  // Filtrar por data e por unidades alocadas ao recepcionista
   const filteredEntries = allEntries.filter((entry) => {
     const entryDate = entry.checkInTime.toISOString().split('T')[0];
     if (entryDate !== selectedDate) {
       return false;
     }
-    if (allowedUnitIds && allowedUnitIds.length > 0) {
-      const uid = entry.unitId || 'unidadebarra';
-      return allowedUnitIds.includes(uid);
+
+    if (!selectedUnitId) {
+      return true;
     }
-    return true;
+
+    return entry.unitId === selectedUnitId;
   });
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('pt-BR', {
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit'
+      second: '2-digit',
     });
   };
 
@@ -52,30 +64,37 @@ function LogScreenEnhancedContent() {
     return date.toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: '2-digit',
-      year: 'numeric'
+      year: 'numeric',
     });
   };
 
-  const exportToExcel = () => {
-    const dataForExcel = filteredEntries.map(entry => {
+  const exportToExcel = async () => {
+    const XLSX = await import('xlsx');
+    const dataForExcel = filteredEntries.map((entry) => {
       const callHistory = entry.callHistory || [];
 
-      const baseData = {
-        'Paciente': entry.patientName,
-        'Telefone': entry.phone,
-        'Unidade': unitLabel(entry.unitId || 'unidadebarra'),
+      const baseData: Record<string, string | number> = {
+        Paciente: entry.patientName,
+        Telefone: entry.phone,
+        Unidade: unitLabel(entry.unitId || 'unidadebarra'),
         'Data Check-in': formatDate(entry.checkInTime),
         'Hora Check-in': formatTime(entry.checkInTime),
         'Total de Chamadas': callHistory.length,
-        'Foi Devolvido': callHistory.some(c => c.returnedTime) ? 'Sim' : 'Não',
-        'Status': entry.status === 'in-service' ? 'Em Atendimento' : entry.status === 'completed' ? 'Concluído' : 'Aguardando'
+        'Foi Devolvido': callHistory.some((call) => call.returnedTime) ? 'Sim' : 'Nao',
+        Status:
+          entry.status === 'in-service'
+            ? 'Em Atendimento'
+            : entry.status === 'completed'
+              ? 'Concluido'
+              : 'Aguardando',
       };
 
-      // Adiciona informações de cada chamada
       callHistory.forEach((call, index) => {
         baseData[`Chamada ${index + 1} - Hora`] = formatTime(call.calledTime);
         baseData[`Chamada ${index + 1} - Recepcionista`] = call.calledBy;
-        baseData[`Chamada ${index + 1} - Devolvido em`] = call.returnedTime ? formatTime(call.returnedTime) : '-';
+        baseData[`Chamada ${index + 1} - Devolvido em`] = call.returnedTime
+          ? formatTime(call.returnedTime)
+          : '-';
       });
 
       return baseData;
@@ -85,30 +104,26 @@ function LogScreenEnhancedContent() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Atendimentos');
 
-    // Ajustar largura das colunas dinamicamente
     const colWidths = [
-      { wch: 25 }, // Paciente
-      { wch: 15 }, // Telefone
-      { wch: 22 }, // Unidade
-      { wch: 12 }, // Data Check-in
-      { wch: 12 }, // Hora Check-in
-      { wch: 18 }, // Total de Chamadas
-      { wch: 15 }, // Foi Devolvido
-      { wch: 15 }, // Status
+      { wch: 25 },
+      { wch: 15 },
+      { wch: 22 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 18 },
+      { wch: 15 },
+      { wch: 15 },
     ];
 
-    // Adicionar larguras para colunas de histórico (3 colunas por chamada)
-    const maxCalls = Math.max(...filteredEntries.map(e => (e.callHistory || []).length), 0);
-    for (let i = 0; i < maxCalls; i++) {
-      colWidths.push({ wch: 15 }); // Hora
-      colWidths.push({ wch: 20 }); // Recepcionista
-      colWidths.push({ wch: 15 }); // Devolvido em
+    const maxCalls = Math.max(...filteredEntries.map((entry) => (entry.callHistory || []).length), 0);
+    for (let index = 0; index < maxCalls; index += 1) {
+      colWidths.push({ wch: 15 });
+      colWidths.push({ wch: 20 });
+      colWidths.push({ wch: 15 });
     }
 
     worksheet['!cols'] = colWidths;
-
-    const fileName = `atendimentos_${selectedDate}.xlsx`;
-    XLSX.writeFile(workbook, fileName);
+    XLSX.writeFile(workbook, `atendimentos_${selectedDate}_${selectedUnitId || 'todas'}.xlsx`);
   };
 
   return (
@@ -121,9 +136,7 @@ function LogScreenEnhancedContent() {
           <img src={logo} alt="CBTEA Logo" className="h-14" />
           <div className="flex-1">
             <h1 className="text-4xl font-bold text-gray-800">Log de Atendimentos</h1>
-            <p className="text-gray-600 mt-1">
-              Registro de check-in e chamadas nas suas unidades alocadas
-            </p>
+            <p className="text-gray-600 mt-1">Registro filtrado por data e unidade operacional</p>
           </div>
           <Button onClick={exportToExcel} disabled={filteredEntries.length === 0}>
             <Download className="w-4 h-4 mr-2" />
@@ -133,11 +146,11 @@ function LogScreenEnhancedContent() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Filtrar por Data</CardTitle>
-            <CardDescription>Selecione a data para visualizar os atendimentos</CardDescription>
+            <CardTitle>Filtros</CardTitle>
+            <CardDescription>Selecione a data e a unidade para visualizar os atendimentos</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-end gap-4">
+          <CardContent className="space-y-4">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end">
               <div className="flex-1 max-w-xs">
                 <Label htmlFor="date">Data</Label>
                 <div className="relative">
@@ -152,10 +165,7 @@ function LogScreenEnhancedContent() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
-                >
+                <Button variant="outline" onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}>
                   Hoje
                 </Button>
                 <Button
@@ -170,6 +180,21 @@ function LogScreenEnhancedContent() {
                 </Button>
               </div>
             </div>
+
+            {allowedUnits.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {allowedUnits.map((unit) => (
+                  <Button
+                    key={unit.id}
+                    type="button"
+                    variant={selectedUnitId === unit.id ? 'default' : 'outline'}
+                    onClick={() => setSelectedUnitId(unit.id)}
+                  >
+                    {unit.name}
+                  </Button>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -185,7 +210,7 @@ function LogScreenEnhancedContent() {
             <CardHeader className="pb-3">
               <CardDescription>Aguardando</CardDescription>
               <CardTitle className="text-3xl">
-                {filteredEntries.filter(e => e.status === 'waiting').length}
+                {filteredEntries.filter((entry) => entry.status === 'waiting').length}
               </CardTitle>
             </CardHeader>
           </Card>
@@ -194,7 +219,7 @@ function LogScreenEnhancedContent() {
             <CardHeader className="pb-3">
               <CardDescription>Em Atendimento</CardDescription>
               <CardTitle className="text-3xl">
-                {filteredEntries.filter(e => e.status === 'in-service').length}
+                {filteredEntries.filter((entry) => entry.status === 'in-service').length}
               </CardTitle>
             </CardHeader>
           </Card>
@@ -203,7 +228,7 @@ function LogScreenEnhancedContent() {
             <CardHeader className="pb-3">
               <CardDescription>Concluídos</CardDescription>
               <CardTitle className="text-3xl">
-                {filteredEntries.filter(e => e.status === 'completed').length}
+                {filteredEntries.filter((entry) => entry.status === 'completed').length}
               </CardTitle>
             </CardHeader>
           </Card>
@@ -211,7 +236,10 @@ function LogScreenEnhancedContent() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Histórico do Dia: {formatDate(new Date(selectedDate))}</CardTitle>
+            <CardTitle>
+              Histórico do Dia: {formatDate(new Date(selectedDate))}
+              {selectedUnitId ? ` • ${unitLabel(selectedUnitId)}` : ''}
+            </CardTitle>
             <CardDescription>
               {filteredEntries.length} {filteredEntries.length === 1 ? 'registro encontrado' : 'registros encontrados'}
             </CardDescription>
@@ -220,15 +248,12 @@ function LogScreenEnhancedContent() {
             {filteredEntries.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
                 <Clock className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                <p>Nenhum registro encontrado para esta data</p>
+                <p>Nenhum registro encontrado para este filtro</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {filteredEntries.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="border rounded-lg p-4 hover:bg-gray-50 transition"
-                  >
+                  <div key={entry.id} className="border rounded-lg p-4 hover:bg-gray-50 transition">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
@@ -237,7 +262,11 @@ function LogScreenEnhancedContent() {
                             {unitLabel(entry.unitId || 'unidadebarra')}
                           </Badge>
                           <Badge variant={entry.status === 'waiting' ? 'secondary' : 'default'}>
-                            {entry.status === 'in-service' ? 'Em Atendimento' : entry.status === 'completed' ? 'Concluído' : 'Aguardando'}
+                            {entry.status === 'in-service'
+                              ? 'Em Atendimento'
+                              : entry.status === 'completed'
+                                ? 'Concluído'
+                                : 'Aguardando'}
                           </Badge>
                         </div>
 
@@ -251,15 +280,10 @@ function LogScreenEnhancedContent() {
                             <Clock className="w-4 h-4" />
                             <span className="text-xs font-medium">CHECK-IN</span>
                           </div>
-                          <p className="text-sm font-semibold text-blue-900">
-                            {formatDate(entry.checkInTime)}
-                          </p>
-                          <p className="text-lg font-bold text-blue-900">
-                            {formatTime(entry.checkInTime)}
-                          </p>
+                          <p className="text-sm font-semibold text-blue-900">{formatDate(entry.checkInTime)}</p>
+                          <p className="text-lg font-bold text-blue-900">{formatTime(entry.checkInTime)}</p>
                         </div>
 
-                        {/* Histórico de Chamadas */}
                         {entry.callHistory && entry.callHistory.length > 0 ? (
                           <div className="mt-3 space-y-2">
                             <p className="text-xs font-semibold text-gray-700 uppercase">Histórico de Chamadas:</p>
@@ -271,7 +295,9 @@ function LogScreenEnhancedContent() {
                                     <span className="text-xs font-medium">CHAMADA #{index + 1}</span>
                                   </div>
                                   {call.returnedTime && (
-                                    <Badge variant="secondary" className="text-xs">Devolvido</Badge>
+                                    <Badge variant="secondary" className="text-xs">
+                                      Devolvido
+                                    </Badge>
                                   )}
                                 </div>
                                 <div className="grid grid-cols-2 gap-2 text-sm">
@@ -291,7 +317,11 @@ function LogScreenEnhancedContent() {
                                 </p>
                                 {call.returnedTime && (
                                   <p className="text-xs text-gray-600 mt-1">
-                                    Tempo em atendimento: {Math.round((call.returnedTime.getTime() - call.calledTime.getTime()) / 60000)} min
+                                    Tempo em atendimento:{' '}
+                                    {Math.round(
+                                      (call.returnedTime.getTime() - call.calledTime.getTime()) / 60000,
+                                    )}{' '}
+                                    min
                                   </p>
                                 )}
                               </div>
@@ -303,12 +333,12 @@ function LogScreenEnhancedContent() {
                           </div>
                         )}
 
-                        {/* Tempo total de espera */}
                         {entry.callHistory && entry.callHistory.length > 0 && (
                           <div className="mt-3 bg-purple-50 border border-purple-200 rounded p-2">
                             <p className="text-xs text-purple-700">
-                              <strong>Resumo:</strong> {entry.callHistory.length} {entry.callHistory.length === 1 ? 'chamada' : 'chamadas'}
-                              {entry.callHistory.some(c => c.returnedTime) && ' • Paciente foi devolvido à fila'}
+                              <strong>Resumo:</strong> {entry.callHistory.length}{' '}
+                              {entry.callHistory.length === 1 ? 'chamada' : 'chamadas'}
+                              {entry.callHistory.some((call) => call.returnedTime) && ' • Paciente foi devolvido à fila'}
                               {entry.status === 'in-service' && ' • Atualmente em atendimento'}
                               {entry.status === 'completed' && ' • Atendimento concluído'}
                             </p>
@@ -329,7 +359,7 @@ function LogScreenEnhancedContent() {
 
 export default function LogScreenV2Enhanced() {
   return (
-    <ProtectedRoute>
+    <ProtectedRoute role="reception">
       <LogScreenEnhancedContent />
     </ProtectedRoute>
   );

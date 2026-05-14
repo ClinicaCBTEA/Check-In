@@ -15,7 +15,7 @@ export default function LoginScreenV2() {
   const [error, setError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { loginReceptionist } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +28,7 @@ export default function LoginScreenV2() {
     setIsSubmitting(true);
 
     try {
-      const success = await login(username, password);
+      const success = await loginReceptionist(username, password);
       if (success) {
         navigate('/recepcao');
       } else {
@@ -110,8 +110,7 @@ export default function LoginScreenV2() {
             </Button>
 
             <div className="text-center text-xs sm:text-sm text-gray-500 mt-4 space-y-2">
-              <p>Credenciais de teste:</p>
-              <p className="font-mono text-xs break-all px-2">usuário: recepcao / senha: cbtea2024</p>
+              <p>Use as credenciais liberadas pela administração da empresa.</p>
               <div className="pt-2 border-t">
                 <Button
                   type="button"

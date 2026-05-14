@@ -6,7 +6,7 @@ import { Label } from '../ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Shield, AlertCircle, Loader2 } from 'lucide-react';
-import { useUserManagement } from '../../context/UserManagementContext';
+import { useAuth } from '../../context/AuthContext';
 import logo from '../../../imports/image.png';
 
 export default function AdminLoginScreenV2() {
@@ -15,7 +15,7 @@ export default function AdminLoginScreenV2() {
   const [error, setError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
-  const { validateAdmin, adminCredentials } = useUserManagement();
+  const { loginAdmin } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,9 +28,8 @@ export default function AdminLoginScreenV2() {
     setIsSubmitting(true);
 
     try {
-      const isValid = await validateAdmin(username, password);
+      const isValid = await loginAdmin(username, password);
       if (isValid) {
-        sessionStorage.setItem('adminAuth', 'true');
         navigate('/admin');
       } else {
         setError(true);
@@ -109,8 +108,7 @@ export default function AdminLoginScreenV2() {
             </Button>
 
             <div className="text-center text-xs sm:text-sm text-gray-500 mt-4">
-              <p>Credenciais admin padrão:</p>
-              <p className="font-mono text-xs mt-1 break-all px-2">usuário: {adminCredentials.username} / senha: {adminCredentials.password}</p>
+              <p>Somente administradores autorizados podem acessar este painel.</p>
             </div>
           </form>
         </CardContent>

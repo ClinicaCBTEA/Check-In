@@ -16,11 +16,14 @@ import {
   DialogTitle,
 } from '../ui/dialog';
 import { useUserManagement } from '../../context/UserManagementContext';
+import { useAuth } from '../../context/AuthContext';
+import ProtectedRoute from './ProtectedRoute';
 import { Shield, UserPlus, Trash2, LogOut, AlertCircle, CheckCircle, Loader2, Building2, Pencil } from 'lucide-react';
 import logo from '../../../imports/image.png';
 
-export default function AdminPanelV2() {
+function AdminPanelContent() {
   const navigate = useNavigate();
+  const { logoutAdmin } = useAuth();
   const {
     units,
     receptionists,
@@ -78,14 +81,13 @@ export default function AdminPanelV2() {
   }, [units]);
 
   useEffect(() => {
-    const isAdmin = sessionStorage.getItem('adminAuth');
-    if (!isAdmin) {
-      navigate('/admin/login');
+    if (adminCredentials.username && !newAdminUsername) {
+      setNewAdminUsername(adminCredentials.username);
     }
-  }, [navigate]);
+  }, [adminCredentials.username, newAdminUsername]);
 
-  const handleLogout = () => {
-    sessionStorage.removeItem('adminAuth');
+  const handleLogout = async () => {
+    await logoutAdmin();
     navigate('/admin/login');
   };
 
@@ -135,7 +137,7 @@ export default function AdminPanelV2() {
       }
     } catch (e) {
       console.error(e);
-      setErrorMessage('Erro ao salvar alocação de unidades.');
+      setErrorMessage(e instanceof Error ? e.message : 'Erro ao salvar alocação de unidades.');
     } finally {
       setIsSavingAllocation(false);
     }
@@ -170,7 +172,7 @@ export default function AdminPanelV2() {
       }
     } catch (error) {
       console.error('Error adding receptionist:', error);
-      setErrorMessage('Erro ao cadastrar recepcionista. Tente novamente.');
+      setErrorMessage(error instanceof Error ? error.message : 'Erro ao cadastrar recepcionista.');
     } finally {
       setIsSubmittingReceptionist(false);
     }
@@ -202,7 +204,7 @@ export default function AdminPanelV2() {
       }
     } catch (err) {
       console.error(err);
-      setErrorMessage('Erro ao cadastrar unidade.');
+      setErrorMessage(err instanceof Error ? err.message : 'Erro ao cadastrar unidade.');
     } finally {
       setIsSubmittingUnit(false);
     }
@@ -243,7 +245,7 @@ export default function AdminPanelV2() {
         await refreshUnits();
       } catch (err) {
         console.error(err);
-        setErrorMessage('Erro ao remover unidade.');
+        setErrorMessage(err instanceof Error ? err.message : 'Erro ao remover unidade.');
       }
     }
   };
@@ -255,7 +257,7 @@ export default function AdminPanelV2() {
         setSuccessMessage(`Recepcionista "${name}" removido com sucesso!`);
       } catch (error) {
         console.error('Error removing receptionist:', error);
-        setErrorMessage('Erro ao remover recepcionista. Tente novamente.');
+        setErrorMessage(error instanceof Error ? error.message : 'Erro ao remover recepcionista.');
       }
     }
   };
@@ -291,8 +293,9 @@ export default function AdminPanelV2() {
         setConfirmAdminPassword('');
 
         setTimeout(() => {
-          sessionStorage.removeItem('adminAuth');
-          navigate('/admin/login');
+          logoutAdmin().then(() => {
+            navigate('/admin/login');
+          });
         }, 2000);
       } else {
         setErrorMessage('Erro ao atualizar credenciais');
@@ -300,7 +303,7 @@ export default function AdminPanelV2() {
       }
     } catch (error) {
       console.error('Error updating admin credentials:', error);
-      setErrorMessage('Erro ao atualizar credenciais. Tente novamente.');
+      setErrorMessage(error instanceof Error ? error.message : 'Erro ao atualizar credenciais.');
       setIsSubmittingAdmin(false);
     }
   };
@@ -568,7 +571,7 @@ export default function AdminPanelV2() {
                       <p className="font-semibold text-lg">{receptionist.name}</p>
                       <p className="text-sm text-gray-600">@{receptionist.username}</p>
                       <p className="text-xs text-gray-500 mt-1">
-                        Cadastrado em {receptionist.createdAt.toLocaleDateString('pt-BR')}
+                        Cadastrado em {new Date(receptionist.createdAt).toLocaleDateString('pt-BR')}
                       </p>
                       <div className="flex flex-wrap gap-1 mt-2">
                         {(receptionist.unitIds || []).map((uid) => (
@@ -618,20 +621,13 @@ export default function AdminPanelV2() {
             <CardContent>
               <form onSubmit={handleUpdateAdminCredentials} className="space-y-4">
                 <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm">
-                  <p className="text-blue-800 font-semibold mb-1">Credenciais Atuais:</p>
+                  <p className="text-blue-800 font-semibold mb-1">Configuração Atual:</p>
                   <p className="text-blue-700">
-                    Usuário:{' '}
-                    <span className="font-mono">
-                      {adminCredentials.username || '—'}
-                    </span>
+                    Usuário: <span className="font-mono">{adminCredentials.username || 'não carregado'}</span>
                   </p>
                   <p className="text-blue-700">
-                    Senha:{' '}
-                    <span className="font-mono">
-                      {adminCredentials.password
-                        ? '•'.repeat(Math.min(adminCredentials.password.length, 32))
-                        : '—'}
-                    </span>
+                    Senha configurada:{' '}
+                    <span className="font-mono">{adminCredentials.passwordConfigured ? 'sim' : 'não'}</span>
                   </p>
                 </div>
 
@@ -751,5 +747,13 @@ export default function AdminPanelV2() {
         </Dialog>
       </div>
     </div>
+  );
+}
+
+export default function AdminPanelV2() {
+  return (
+    <ProtectedRoute role="admin">
+      <AdminPanelContent />
+    </ProtectedRoute>
   );
 }

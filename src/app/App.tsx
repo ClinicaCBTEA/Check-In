@@ -6,12 +6,12 @@ import { AuthProvider } from './context/AuthContext';
 
 export default function App() {
   return (
-    <UserManagementProvider>
-      <AuthProvider>
+    <AuthProvider>
+      <UserManagementProvider>
         <SimpleQueueProvider>
           <RouterProvider router={router} />
         </SimpleQueueProvider>
-      </AuthProvider>
-    </UserManagementProvider>
+      </UserManagementProvider>
+    </AuthProvider>
   );
 }

@@ -1,14 +1,15 @@
 import { createBrowserRouter } from 'react-router';
+import type { ComponentType } from 'react';
 import RootLayout from './components/RootLayout';
-import QrCodeScreenV2 from './components/v2/QrCodeScreenV2';
-import RegisterScreenV2 from './components/v2/RegisterScreenV2';
-import QueuePositionScreenV2 from './components/v2/QueuePositionScreenV2';
-import LoginScreenV2 from './components/v2/LoginScreenV2';
-import ReceptionScreenV2 from './components/v2/ReceptionScreenV2';
-import LogScreenV2Enhanced from './components/v2/LogScreenV2Enhanced';
-import AdminLoginScreenV2 from './components/v2/AdminLoginScreenV2';
-import AdminPanelV2 from './components/v2/AdminPanelV2';
-import WelcomeHome from './components/v2/WelcomeHome';
+
+const lazyComponent = <T extends { default: ComponentType<any> }>(
+  loader: () => Promise<T>,
+) => {
+  return async () => {
+    const module = await loader();
+    return { Component: module.default };
+  };
+};
 
 export const router = createBrowserRouter([
   {
@@ -16,47 +17,47 @@ export const router = createBrowserRouter([
     children: [
       {
         path: '/',
-        Component: WelcomeHome,
+        lazy: lazyComponent(() => import('./components/v2/WelcomeHome')),
       },
       {
         path: '/qrcode',
-        Component: QrCodeScreenV2,
+        lazy: lazyComponent(() => import('./components/v2/QrCodeScreenV2')),
       },
       {
         path: '/fila',
-        Component: QueuePositionScreenV2,
+        lazy: lazyComponent(() => import('./components/v2/QueuePositionScreenV2')),
       },
       {
         path: '/login',
-        Component: LoginScreenV2,
+        lazy: lazyComponent(() => import('./components/v2/LoginScreenV2')),
       },
       {
         path: '/recepcao',
-        Component: ReceptionScreenV2,
+        lazy: lazyComponent(() => import('./components/v2/ReceptionScreenV2')),
       },
       {
         path: '/log',
-        Component: LogScreenV2Enhanced,
+        lazy: lazyComponent(() => import('./components/v2/LogScreenV2Enhanced')),
       },
       {
         path: '/admin/login',
-        Component: AdminLoginScreenV2,
+        lazy: lazyComponent(() => import('./components/v2/AdminLoginScreenV2')),
       },
       {
         path: '/admin',
-        Component: AdminPanelV2,
+        lazy: lazyComponent(() => import('./components/v2/AdminPanelV2')),
       },
       {
         path: '/:unitSlug/qrcode',
-        Component: QrCodeScreenV2,
+        lazy: lazyComponent(() => import('./components/v2/QrCodeScreenV2')),
       },
       {
         path: '/:unitSlug/fila',
-        Component: QueuePositionScreenV2,
+        lazy: lazyComponent(() => import('./components/v2/QueuePositionScreenV2')),
       },
       {
         path: '/:unitSlug',
-        Component: RegisterScreenV2,
+        lazy: lazyComponent(() => import('./components/v2/RegisterScreenV2')),
       },
     ],
   },

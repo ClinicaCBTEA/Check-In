@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import * as api from '../../utils/api';
 import { useAuth } from './AuthContext';
 
@@ -24,11 +24,10 @@ export interface QueueEntry {
 
 interface SimpleQueueContextType {
   queue: QueueEntry[];
-  /** Primeiro paciente em atendimento entre as unidades monitoradas (painel interno). */
   currentPatient: QueueEntry | null;
   currentByUnit: Record<string, QueueEntry | null>;
-  addToQueue: (patientName: string, phone: string, unitId: string) => Promise<string>;
-  callNext: (receptionistName: string) => Promise<void>;
+  addToQueue: (patientName: string, phone: string, unitId: string) => Promise<{ id: string; accessToken: string; unitId: string }>;
+  callNext: (receptionistName: string, unitId: string) => Promise<void>;
   callSpecificPatient: (patientId: string, receptionistName: string) => Promise<void>;
   completeService: (patientId: string) => Promise<void>;
   returnToQueue: (patientId: string) => Promise<void>;
@@ -40,361 +39,160 @@ interface SimpleQueueContextType {
 
 const SimpleQueueContext = createContext<SimpleQueueContextType | undefined>(undefined);
 
-const SS_QUEUE_KEY = 'cbtea_queue_backup';
-const SS_CURRENT_KEY = 'cbtea_currentPatient_by_unit_backup';
-const IS_PROD = import.meta.env.PROD;
-
-function parseQueueEntry(entry: any): QueueEntry {
+function parseQueueEntry(entry: api.QueueEntryDTO): QueueEntry {
   return {
     ...entry,
-    unitId: entry.unitId || 'unidadebarra',
     checkInTime: new Date(entry.checkInTime),
     calledTime: entry.calledTime ? new Date(entry.calledTime) : undefined,
     completedTime: entry.completedTime ? new Date(entry.completedTime) : undefined,
-    callHistory: (entry.callHistory || []).map((ch: any) => ({
-      ...ch,
-      calledTime: new Date(ch.calledTime),
-      returnedTime: ch.returnedTime ? new Date(ch.returnedTime) : undefined,
+    callHistory: (entry.callHistory || []).map((historyEntry) => ({
+      ...historyEntry,
+      calledTime: new Date(historyEntry.calledTime),
+      returnedTime: historyEntry.returnedTime ? new Date(historyEntry.returnedTime) : undefined,
     })),
   };
 }
 
-async function loadCurrentByUnit(unitIds: string[]): Promise<Record<string, QueueEntry | null>> {
-  const out: Record<string, QueueEntry | null> = {};
-  await Promise.all(
-    unitIds.map(async (uid) => {
-      try {
-        const p = await api.fetchCurrentPatient(uid);
-        out[uid] = p ? parseQueueEntry(p) : null;
-      } catch {
-        out[uid] = null;
-      }
-    })
-  );
-  return out;
+function deriveCurrentByUnit(queueEntries: QueueEntry[]) {
+  const map: Record<string, QueueEntry | null> = {};
+
+  for (const entry of queueEntries) {
+    if (entry.status !== 'in-service') {
+      continue;
+    }
+
+    const existing = map[entry.unitId];
+    if (!existing) {
+      map[entry.unitId] = entry;
+      continue;
+    }
+
+    const existingTime = existing.calledTime?.getTime() || existing.checkInTime.getTime();
+    const candidateTime = entry.calledTime?.getTime() || entry.checkInTime.getTime();
+    if (candidateTime < existingTime) {
+      map[entry.unitId] = entry;
+    }
+  }
+
+  return map;
 }
 
 function firstCurrentPatient(map: Record<string, QueueEntry | null>): QueueEntry | null {
-  for (const v of Object.values(map)) {
-    if (v) {
-      return v;
+  for (const patient of Object.values(map)) {
+    if (patient) {
+      return patient;
     }
   }
+
   return null;
 }
 
 export function SimpleQueueProvider({ children }: { children: ReactNode }) {
-  const { receptionist } = useAuth();
+  const { isAuthenticated, receptionistToken } = useAuth();
   const [queue, setQueue] = useState<QueueEntry[]>([]);
-  const [currentByUnit, setCurrentByUnit] = useState<Record<string, QueueEntry | null>>({});
-  const [currentPatient, setCurrentPatient] = useState<QueueEntry | null>(null);
 
   const refreshQueue = useCallback(async () => {
-    try {
-      const unitsFilter =
-        receptionist?.unitIds && receptionist.unitIds.length > 0
-          ? receptionist.unitIds
-          : undefined;
-
-      const queueData = await api.fetchQueue(unitsFilter);
-
-      let currentMap: Record<string, QueueEntry | null> = {};
-      if (receptionist?.unitIds && receptionist.unitIds.length > 0) {
-        currentMap = await loadCurrentByUnit(receptionist.unitIds);
-      }
-
-      const parsedQueue = queueData.map(parseQueueEntry);
-      parsedQueue.sort((a, b) => a.checkInTime.getTime() - b.checkInTime.getTime());
-      setQueue(parsedQueue);
-      setCurrentByUnit(currentMap);
-      setCurrentPatient(firstCurrentPatient(currentMap));
-
-      if (typeof window !== 'undefined') {
-        try {
-          sessionStorage.setItem(SS_QUEUE_KEY, JSON.stringify(parsedQueue));
-          sessionStorage.setItem(SS_CURRENT_KEY, JSON.stringify(currentMap));
-        } catch {
-          /* ignore quota / private mode */
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching queue from server:', error);
-      if (!IS_PROD) {
-        console.warn('Servidor indisponível — usando cópia da sessão atual, se existir.');
-      }
-
-      const queueBackup =
-        typeof window !== 'undefined' ? sessionStorage.getItem(SS_QUEUE_KEY) : null;
-      const currentBackup =
-        typeof window !== 'undefined' ? sessionStorage.getItem(SS_CURRENT_KEY) : null;
-
-      if (queueBackup) {
-        try {
-          const parsedBackup = JSON.parse(queueBackup).map(parseQueueEntry);
-          setQueue(parsedBackup);
-        } catch (e) {
-          console.error('Error parsing queue backup:', e);
-        }
-      }
-
-      if (currentBackup && currentBackup !== 'null') {
-        try {
-          const raw = JSON.parse(currentBackup) as Record<string, any>;
-          const parsed: Record<string, QueueEntry | null> = {};
-          for (const k of Object.keys(raw)) {
-            parsed[k] = raw[k] ? parseQueueEntry(raw[k]) : null;
-          }
-          setCurrentByUnit(parsed);
-          setCurrentPatient(firstCurrentPatient(parsed));
-        } catch (e) {
-          console.error('Error parsing current patient backup:', e);
-        }
-      }
+    if (!isAuthenticated || !receptionistToken) {
+      setQueue([]);
+      return;
     }
-  }, [receptionist?.unitIds, receptionist?.id]);
+
+    const queueData = await api.fetchQueue(receptionistToken);
+    const parsedQueue = queueData.map(parseQueueEntry);
+    parsedQueue.sort((left, right) => left.checkInTime.getTime() - right.checkInTime.getTime());
+    setQueue(parsedQueue);
+  }, [isAuthenticated, receptionistToken]);
 
   useEffect(() => {
-    refreshQueue();
-    const interval = setInterval(refreshQueue, 3000);
-    return () => clearInterval(interval);
-  }, [refreshQueue]);
-
-  const addToQueue = async (patientName: string, phone: string, unitId: string): Promise<string> => {
-    try {
-      const newEntry = await api.addPatientToQueue(patientName, phone, unitId);
-      await refreshQueue();
-      return newEntry.id;
-    } catch (error) {
-      console.error('Error adding patient to queue:', error);
-      if (IS_PROD) {
-        throw error;
-      }
-      console.warn('Server unavailable, using local mode');
-
-      const id = `patient-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const newEntry: QueueEntry = {
-        id,
-        patientName,
-        phone,
-        unitId,
-        checkInTime: new Date(),
-        position: queue.length + 1,
-        status: 'waiting',
-        callHistory: [],
-      };
-
-      const updatedQueue = [...queue, newEntry];
-      setQueue(updatedQueue);
-      try {
-        sessionStorage.setItem(SS_QUEUE_KEY, JSON.stringify(updatedQueue));
-      } catch {
-        /* ignore */
-      }
-
-      return id;
+    if (!isAuthenticated || !receptionistToken) {
+      setQueue([]);
+      return;
     }
-  };
 
-  const callNext = async (receptionistName: string): Promise<void> => {
-    try {
-      const waitingPatients = queue.filter((p) => p.status === 'waiting');
-      if (waitingPatients.length > 0) {
-        const nextPatient = waitingPatients[0];
-        const unitId = nextPatient.unitId;
-        const callTime = new Date();
-        const newCallHistory: CallHistory = {
-          calledTime: callTime,
-          calledBy: receptionistName,
-        };
-        const updates = {
-          calledTime: callTime.toISOString(),
-          calledBy: receptionistName,
-          status: 'in-service',
-          callHistory: [
-            ...(nextPatient.callHistory || []),
-            {
-              calledTime: callTime.toISOString(),
-              calledBy: receptionistName,
-            },
-          ],
-        };
-
-        await api.updateQueueEntry(nextPatient.id, updates);
-
-        const updatedPatient = {
-          ...nextPatient,
-          ...updates,
-          callHistory: [...(nextPatient.callHistory || []), newCallHistory],
-        };
-        await api.setCurrentPatient(updatedPatient, unitId);
-        await refreshQueue();
-      }
-    } catch (error) {
-      console.error('Error calling next patient:', error);
-      throw error;
-    }
-  };
-
-  const callSpecificPatient = async (patientId: string, receptionistName: string): Promise<void> => {
-    try {
-      const patient = queue.find((p) => p.id === patientId && p.status === 'waiting');
-      if (patient) {
-        const unitId = patient.unitId;
-        const callTime = new Date();
-        const newCallHistory: CallHistory = {
-          calledTime: callTime,
-          calledBy: receptionistName,
-        };
-        const updates = {
-          calledTime: callTime.toISOString(),
-          calledBy: receptionistName,
-          status: 'in-service',
-          callHistory: [
-            ...(patient.callHistory || []),
-            {
-              calledTime: callTime.toISOString(),
-              calledBy: receptionistName,
-            },
-          ],
-        };
-
-        await api.updateQueueEntry(patientId, updates);
-
-        const updatedPatient = {
-          ...patient,
-          ...updates,
-          callHistory: [...(patient.callHistory || []), newCallHistory],
-        };
-        await api.setCurrentPatient(updatedPatient, unitId);
-        await refreshQueue();
-      }
-    } catch (error) {
-      console.error('Error calling specific patient:', error);
-      throw error;
-    }
-  };
-
-  const completeService = async (patientId: string): Promise<void> => {
-    try {
-      const patient = queue.find((p) => p.id === patientId && p.status === 'in-service');
-      if (patient) {
-        const completedTime = new Date();
-        const updates = {
-          completedTime: completedTime.toISOString(),
-          status: 'completed',
-        };
-
-        await api.updateQueueEntry(patientId, updates);
-
-        const uid = patient.unitId;
-        if (currentByUnit[uid]?.id === patientId) {
-          await api.setCurrentPatient(null, uid);
-        }
-
-        await refreshQueue();
-      }
-    } catch (error) {
-      console.error('Error completing service:', error);
-      throw error;
-    }
-  };
-
-  const returnToQueue = async (patientId: string): Promise<void> => {
-    try {
-      const patient = queue.find(
-        (p) => p.id === patientId && (p.status === 'in-service' || p.status === 'completed')
-      );
-      if (patient) {
-        const updatedHistory = [...(patient.callHistory || [])];
-        if (updatedHistory.length > 0) {
-          const lastCall = updatedHistory[updatedHistory.length - 1];
-          if (!lastCall.returnedTime) {
-            lastCall.returnedTime = new Date();
-          }
-        }
-
-        const updates = {
-          checkInTime: new Date().toISOString(),
-          calledTime: undefined,
-          calledBy: undefined,
-          completedTime: undefined,
-          status: 'waiting',
-          callHistory: updatedHistory.map((ch) => ({
-            ...ch,
-            calledTime: ch.calledTime instanceof Date ? ch.calledTime.toISOString() : ch.calledTime,
-            returnedTime: ch.returnedTime
-              ? ch.returnedTime instanceof Date
-                ? ch.returnedTime.toISOString()
-                : ch.returnedTime
-              : undefined,
-          })),
-        };
-
-        await api.updateQueueEntry(patientId, updates);
-
-        const uid = patient.unitId;
-        if (currentByUnit[uid]?.id === patientId) {
-          await api.setCurrentPatient(null, uid);
-        }
-
-        await refreshQueue();
-      }
-    } catch (error) {
-      console.error('Error returning patient to queue:', error);
-      throw error;
-    }
-  };
-
-  const moveToFront = async (patientId: string): Promise<void> => {
-    try {
-      const patient = queue.find((p) => p.id === patientId && p.status === 'waiting');
-      if (patient) {
-        const priorityTime = new Date('2000-01-01T00:00:00Z');
-        const updates = {
-          ...patient,
-          checkInTime: priorityTime.toISOString(),
-          priorityFlag: true,
-        };
-
-        await api.updateQueueEntry(patientId, updates);
-        await refreshQueue();
-      }
-    } catch (error) {
-      console.error('Error moving patient to front:', error);
-
-      const patient = queue.find((p) => p.id === patientId && p.status === 'waiting');
-      if (patient) {
-        const waitingPatients = queue.filter((p) => p.status === 'waiting');
-        const otherStatuses = queue.filter((p) => p.status !== 'waiting');
-        const reorderedWaiting = [patient, ...waitingPatients.filter((p) => p.id !== patientId)];
-        setQueue([...reorderedWaiting, ...otherStatuses]);
-        try {
-          sessionStorage.setItem(SS_QUEUE_KEY, JSON.stringify([...reorderedWaiting, ...otherStatuses]));
-        } catch {
-          /* ignore */
-        }
-      }
-    }
-  };
-
-  const getPatientPosition = (id: string, unitId?: string): number | null => {
-    const uid = unitId || queue.find((p) => p.id === id)?.unitId;
-    const waitingPatients = queue.filter((p) => {
-      if (p.status !== 'waiting') {
-        return false;
-      }
-      if (uid) {
-        return p.unitId === uid;
-      }
-      return true;
+    refreshQueue().catch((error) => {
+      console.error('Error fetching queue from server:', error);
     });
-    const patientIndex = waitingPatients.findIndex((p) => p.id === id);
-    return patientIndex !== -1 ? patientIndex + 1 : null;
+
+    const interval = window.setInterval(() => {
+      refreshQueue().catch((error) => {
+        console.error('Error refreshing queue:', error);
+      });
+    }, 5000);
+
+    return () => window.clearInterval(interval);
+  }, [isAuthenticated, receptionistToken, refreshQueue]);
+
+  const addToQueue = async (patientName: string, phone: string, unitId: string) => {
+    return api.addPatientToQueue(patientName, phone, unitId);
   };
 
-  const getLogEntries = (): QueueEntry[] => {
-    return [...queue].sort((a, b) => a.checkInTime.getTime() - b.checkInTime.getTime());
+  const callNext = async (receptionistName: string, unitId: string) => {
+    if (!receptionistToken) {
+      throw new Error('Reception session not available');
+    }
+
+    await api.callNextPatient(receptionistName, unitId, receptionistToken);
+    await refreshQueue();
   };
+
+  const callSpecificPatient = async (patientId: string, receptionistName: string) => {
+    if (!receptionistToken) {
+      throw new Error('Reception session not available');
+    }
+
+    await api.callSpecificPatient(patientId, receptionistName, receptionistToken);
+    await refreshQueue();
+  };
+
+  const completeService = async (patientId: string) => {
+    if (!receptionistToken) {
+      throw new Error('Reception session not available');
+    }
+
+    await api.completeQueueService(patientId, receptionistToken);
+    await refreshQueue();
+  };
+
+  const returnToQueue = async (patientId: string) => {
+    if (!receptionistToken) {
+      throw new Error('Reception session not available');
+    }
+
+    await api.returnQueueEntry(patientId, receptionistToken);
+    await refreshQueue();
+  };
+
+  const moveToFront = async (patientId: string) => {
+    if (!receptionistToken) {
+      throw new Error('Reception session not available');
+    }
+
+    await api.prioritizeQueueEntry(patientId, receptionistToken);
+    await refreshQueue();
+  };
+
+  const getPatientPosition = useCallback(
+    (id: string, unitId?: string): number | null => {
+      const resolvedUnitId = unitId || queue.find((patient) => patient.id === id)?.unitId;
+      const waitingPatients = queue.filter((patient) => {
+        if (patient.status !== 'waiting') {
+          return false;
+        }
+
+        return resolvedUnitId ? patient.unitId === resolvedUnitId : true;
+      });
+      const patientIndex = waitingPatients.findIndex((patient) => patient.id === id);
+      return patientIndex !== -1 ? patientIndex + 1 : null;
+    },
+    [queue],
+  );
+
+  const getLogEntries = useCallback(() => {
+    return [...queue].sort((left, right) => left.checkInTime.getTime() - right.checkInTime.getTime());
+  }, [queue]);
+
+  const currentByUnit = useMemo(() => deriveCurrentByUnit(queue), [queue]);
+  const currentPatient = useMemo(() => firstCurrentPatient(currentByUnit), [currentByUnit]);
 
   return (
     <SimpleQueueContext.Provider

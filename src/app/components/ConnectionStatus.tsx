@@ -12,7 +12,7 @@ export function ConnectionStatus() {
   useEffect(() => {
     checkConnection();
 
-    const interval = setInterval(checkConnection, 10000);
+    const interval = setInterval(checkConnection, 15000);
 
     return () => clearInterval(interval);
   }, []);
@@ -34,10 +34,8 @@ export function ConnectionStatus() {
         const isOk = data.status === 'ok';
         setIsConnected(isOk);
 
-        if (!IS_PROD && isOk && data.version) {
-          if (data.version !== '2.0') {
-            console.warn('Server version mismatch. Please redeploy the Edge Function.');
-          }
+        if (!IS_PROD && isOk && data.version && data.version !== '3.0') {
+          console.warn('Server version mismatch. Please redeploy the Edge Function.');
         }
       } else {
         setIsConnected(false);
@@ -65,10 +63,10 @@ export function ConnectionStatus() {
               </p>
             ) : (
               <div className="space-y-2 text-sm">
-                <p className="font-semibold">Modo local / sem sincronização</p>
+                <p className="font-semibold">Sincronização temporariamente indisponível</p>
                 <p>
-                  A função <strong>server</strong> no Supabase não respondeu. Em desenvolvimento você pode
-                  continuar testando com fallback local; em produção os dados vêm apenas do servidor.
+                  O servidor do check-in não respondeu. Em desenvolvimento você pode validar a função{' '}
+                  <span className="font-mono">server</span> antes de testar o fluxo completo.
                 </p>
                 <p className="text-xs opacity-80">
                   Projeto: <span className="font-mono">{projectId}</span> — publique a Edge Function e teste{' '}

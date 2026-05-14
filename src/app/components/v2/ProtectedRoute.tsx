@@ -1,23 +1,25 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router';
+import type { ReactNode } from 'react';
+import { Navigate } from 'react-router';
 import { useAuth } from '../../context/AuthContext';
 
 interface ProtectedRouteProps {
-  children: React.ReactNode;
+  children: ReactNode;
+  role: 'reception' | 'admin';
 }
 
-export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated } = useAuth();
-  const navigate = useNavigate();
+export default function ProtectedRoute({ children, role }: ProtectedRouteProps) {
+  const { isHydrating, isAuthenticated, isAdminAuthenticated } = useAuth();
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
-    }
-  }, [isAuthenticated, navigate]);
-
-  if (!isAuthenticated) {
+  if (isHydrating) {
     return null;
+  }
+
+  if (role === 'admin' && !isAdminAuthenticated) {
+    return <Navigate to="/admin/login" replace />;
+  }
+
+  if (role === 'reception' && !isAuthenticated) {
+    return <Navigate to="/login" replace />;
   }
 
   return <>{children}</>;

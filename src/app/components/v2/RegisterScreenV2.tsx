@@ -81,10 +81,15 @@ export default function RegisterScreenV2() {
     if (patientName && phone) {
       setIsSubmitting(true);
       try {
-        const patientId = await addToQueue(patientName, phone, unit.id);
+        const registration = await addToQueue(patientName, phone, unit.id);
         navigate('fila', {
           relative: 'path',
-          state: { patientId, unitId: unit.id, unitSlug: unit.slug },
+          state: {
+            patientId: registration.id,
+            accessToken: registration.accessToken,
+            unitId: unit.id,
+            unitSlug: unit.slug,
+          },
         });
       } catch (error) {
         console.error('Error adding patient to queue:', error);
