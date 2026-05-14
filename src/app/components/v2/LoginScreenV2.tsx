@@ -110,9 +110,7 @@ export default function LoginScreenV2() {
             </Button>
 
             <div className="text-center text-xs sm:text-sm text-gray-500 mt-4 space-y-2">
-              <p>Credenciais de teste:</p>
-              <p className="font-mono text-xs break-all px-2">usuário: recepcao / senha: cbtea2024</p>
-              <div className="pt-2 border-t">
+
                 <Button
                   type="button"
                   variant="link"
