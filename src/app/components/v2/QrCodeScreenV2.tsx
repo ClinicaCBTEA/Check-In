@@ -123,16 +123,22 @@ export default function QrCodeScreenV2() {
             <QRCodeSVG value={qrCodeUrl} size={qrSize} level="H" includeMargin={false} />
           </div>
           <div className="text-center w-full">
-            <p className="text-xs sm:text-sm text-gray-500 mb-2">Ou clique no botão abaixo para testar</p>
+            <p className="text-xs sm:text-sm text-gray-500 mb-2">
+              {import.meta.env.PROD ? 'Ou abra o check-in pelo botão abaixo' : 'Ou clique no botão abaixo para testar'}
+            </p>
             <Button onClick={handleScanQR} size="lg" className="w-full">
-              <span className="text-sm sm:text-base">Simular Escaneamento</span>
+              <span className="text-sm sm:text-base">
+                {import.meta.env.PROD ? 'Abrir check-in' : 'Simular escaneamento'}
+              </span>
             </Button>
           </div>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 sm:p-3 w-full">
-            <p className="text-xs text-blue-800 break-all">
-              <strong>URL:</strong> {qrCodeUrl}
-            </p>
-          </div>
+          {!import.meta.env.PROD && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 sm:p-3 w-full">
+              <p className="text-xs text-blue-800 break-all">
+                <strong>URL (somente desenvolvimento):</strong> {qrCodeUrl}
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

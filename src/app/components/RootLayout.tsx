@@ -1,5 +1,4 @@
 import { Outlet } from 'react-router';
-import DebugMenu from './DebugMenu';
 import { ConnectionStatus } from './ConnectionStatus';
 
 export default function RootLayout() {
@@ -7,7 +6,6 @@ export default function RootLayout() {
     <>
       <ConnectionStatus />
       <Outlet />
-      <DebugMenu />
     </>
   );
 }

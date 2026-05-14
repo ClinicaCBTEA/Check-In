@@ -619,8 +619,20 @@ export default function AdminPanelV2() {
               <form onSubmit={handleUpdateAdminCredentials} className="space-y-4">
                 <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm">
                   <p className="text-blue-800 font-semibold mb-1">Credenciais Atuais:</p>
-                  <p className="text-blue-700">Usuário: <span className="font-mono">{adminCredentials.username}</span></p>
-                  <p className="text-blue-700">Senha: <span className="font-mono">{'•'.repeat(adminCredentials.password.length)}</span></p>
+                  <p className="text-blue-700">
+                    Usuário:{' '}
+                    <span className="font-mono">
+                      {adminCredentials.username || '—'}
+                    </span>
+                  </p>
+                  <p className="text-blue-700">
+                    Senha:{' '}
+                    <span className="font-mono">
+                      {adminCredentials.password
+                        ? '•'.repeat(Math.min(adminCredentials.password.length, 32))
+                        : '—'}
+                    </span>
+                  </p>
                 </div>
 
                 <div className="space-y-2">

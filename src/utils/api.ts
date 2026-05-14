@@ -5,7 +5,9 @@ const BASE_URL = `https://${projectId}.supabase.co/functions/v1/server`;
 async function apiCall<T>(endpoint: string, options?: RequestInit): Promise<T> {
   try {
     const url = `${BASE_URL}${endpoint}`;
-    console.log(`API Call: ${options?.method || 'GET'} ${url}`);
+    if (import.meta.env.DEV) {
+      console.log(`API Call: ${options?.method || 'GET'} ${url}`);
+    }
 
     const response = await fetch(url, {
       ...options,
@@ -17,20 +19,26 @@ async function apiCall<T>(endpoint: string, options?: RequestInit): Promise<T> {
     });
 
     if (!response.ok) {
-      console.error(`API Error: ${response.status} ${response.statusText}`);
+      if (import.meta.env.DEV) {
+        console.error(`API Error: ${response.status} ${response.statusText}`);
+      }
       throw new Error(`Server error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
 
     if (!data.success) {
-      console.error('API returned error:', data.error);
+      if (import.meta.env.DEV) {
+        console.error('API returned error:', data.error);
+      }
       throw new Error(data.error || 'API request failed');
     }
 
     return data.data;
   } catch (error) {
-    console.error('API call failed:', error);
+    if (import.meta.env.DEV) {
+      console.error('API call failed:', error);
+    }
     throw error;
   }
 }

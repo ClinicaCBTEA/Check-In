@@ -2,7 +2,7 @@ import { Link } from 'react-router';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { useUserManagement } from '../../context/UserManagementContext';
-import { Building2, QrCode, Shield } from 'lucide-react';
+import { Building2, QrCode } from 'lucide-react';
 import logo from '../../../imports/image.png';
 
 export default function WelcomeHome() {
@@ -15,7 +15,7 @@ export default function WelcomeHome() {
           <img src={logo} alt="CBTEA Logo" className="h-14 sm:h-16 mx-auto mb-4" />
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Check-in por unidade</h1>
           <p className="text-gray-600 mt-2 text-sm sm:text-base">
-            Escolha sua unidade para entrar na fila ou acesse a recepção / administração.
+            Escolha sua unidade para entrar na fila de atendimento.
           </p>
         </div>
 
@@ -30,7 +30,7 @@ export default function WelcomeHome() {
           <CardContent className="space-y-3">
             {units.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-4">
-                Nenhuma unidade cadastrada. Acesse o painel administrativo para criar unidades.
+                Lista de unidades indisponível no momento. Tente atualizar ou fale com a recepção.
               </p>
             ) : (
               units.map((u) => (
@@ -61,18 +61,6 @@ export default function WelcomeHome() {
             </Button>
           </CardContent>
         </Card>
-
-        <div className="flex flex-wrap justify-center gap-3">
-          <Button asChild variant="outline">
-            <Link to="/login">Recepção</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link to="/admin/login" className="flex items-center gap-1">
-              <Shield className="w-4 h-4" />
-              Admin
-            </Link>
-          </Button>
-        </div>
       </div>
     </div>
   );

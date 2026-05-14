@@ -37,6 +37,9 @@ const UserManagementContext = createContext<UserManagementContextType | undefine
 
 const ADMIN_STORAGE_KEY = 'admin_credentials_backup';
 const RECEPTIONISTS_STORAGE_KEY = 'receptionists_backup';
+const UNITS_STORAGE_KEY = 'units_backup';
+
+const IS_PROD = import.meta.env.PROD;
 
 const DEFAULT_ADMIN_CREDENTIALS: AdminCredentials = {
   username: 'admin',
@@ -106,8 +109,8 @@ function serializeReceptionists(receptionists: Receptionist[]) {
 }
 
 function loadStoredAdminCredentials(): AdminCredentials {
-  if (typeof window === 'undefined') {
-    return DEFAULT_ADMIN_CREDENTIALS;
+  if (typeof window === 'undefined' || IS_PROD) {
+    return { username: '', password: '' };
   }
 
   try {
@@ -132,7 +135,7 @@ function loadStoredAdminCredentials(): AdminCredentials {
 }
 
 function storeAdminCredentials(credentials: AdminCredentials) {
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' || IS_PROD) {
     return;
   }
 
@@ -140,8 +143,8 @@ function storeAdminCredentials(credentials: AdminCredentials) {
 }
 
 function loadStoredReceptionists(): Receptionist[] {
-  if (typeof window === 'undefined') {
-    return [DEFAULT_RECEPTIONIST];
+  if (typeof window === 'undefined' || IS_PROD) {
+    return [];
   }
 
   try {
@@ -163,7 +166,7 @@ function loadStoredReceptionists(): Receptionist[] {
 }
 
 function storeReceptionists(receptionists: Receptionist[]) {
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' || IS_PROD) {
     return;
   }
 
@@ -174,8 +177,8 @@ function storeReceptionists(receptionists: Receptionist[]) {
 }
 
 function loadStoredUnits(): UnitDTO[] {
-  if (typeof window === 'undefined') {
-    return DEFAULT_UNITS;
+  if (typeof window === 'undefined' || IS_PROD) {
+    return [];
   }
   try {
     const stored = localStorage.getItem(UNITS_STORAGE_KEY);
@@ -193,22 +196,34 @@ function loadStoredUnits(): UnitDTO[] {
 }
 
 function storeUnits(units: UnitDTO[]) {
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' || IS_PROD) {
     return;
   }
   localStorage.setItem(UNITS_STORAGE_KEY, JSON.stringify(units));
 }
 
 export function UserManagementProvider({ children }: { children: ReactNode }) {
-  const [adminCredentials, setAdminCredentials] = useState<AdminCredentials>(() => loadStoredAdminCredentials());
+  const [adminCredentials, setAdminCredentials] = useState<AdminCredentials>(() =>
+    IS_PROD ? { username: '', password: '' } : loadStoredAdminCredentials()
+  );
 
-  const [receptionists, setReceptionists] = useState<Receptionist[]>(() => loadStoredReceptionists());
-  const [units, setUnits] = useState<UnitDTO[]>(() => loadStoredUnits());
+  const [receptionists, setReceptionists] = useState<Receptionist[]>(() =>
+    IS_PROD ? [] : loadStoredReceptionists()
+  );
+  const [units, setUnits] = useState<UnitDTO[]>(() => (IS_PROD ? [] : loadStoredUnits()));
 
   useEffect(() => {
-    refreshReceptionists();
-    refreshUnits();
-    loadAdminCredentials();
+    if (typeof window === 'undefined' || !IS_PROD) {
+      return;
+    }
+    localStorage.removeItem(ADMIN_STORAGE_KEY);
+    localStorage.removeItem(RECEPTIONISTS_STORAGE_KEY);
+    localStorage.removeItem(UNITS_STORAGE_KEY);
+    localStorage.removeItem('queue_backup');
+    localStorage.removeItem('currentPatient_backup');
+    localStorage.removeItem('currentPatient_by_unit_backup');
+    sessionStorage.removeItem('cbtea_queue_backup');
+    sessionStorage.removeItem('cbtea_currentPatient_by_unit_backup');
   }, []);
 
   const refreshUnits = async () => {
@@ -218,7 +233,7 @@ export function UserManagementProvider({ children }: { children: ReactNode }) {
       storeUnits(data);
     } catch (error) {
       console.error('Error fetching units:', error);
-      setUnits(loadStoredUnits());
+      setUnits(IS_PROD ? [] : loadStoredUnits());
     }
   };
 
@@ -230,7 +245,7 @@ export function UserManagementProvider({ children }: { children: ReactNode }) {
       storeReceptionists(parsedReceptionists);
     } catch (error) {
       console.error('Error fetching receptionists:', error);
-      setReceptionists(loadStoredReceptionists());
+      setReceptionists(IS_PROD ? [] : loadStoredReceptionists());
     }
   };
 
@@ -241,7 +256,7 @@ export function UserManagementProvider({ children }: { children: ReactNode }) {
       storeAdminCredentials(creds);
     } catch (error) {
       console.error('Error fetching admin credentials:', error);
-      setAdminCredentials(loadStoredAdminCredentials());
+      setAdminCredentials(IS_PROD ? { username: '', password: '' } : loadStoredAdminCredentials());
     }
   };
 
@@ -257,7 +272,7 @@ export function UserManagementProvider({ children }: { children: ReactNode }) {
       return true;
     } catch (error) {
       console.error('Error adding receptionist:', error);
-      if (!shouldUseLocalFallback(error)) {
+      if (!shouldUseLocalFallback(error) || IS_PROD) {
         return false;
       }
 
@@ -289,7 +304,7 @@ export function UserManagementProvider({ children }: { children: ReactNode }) {
       return true;
     } catch (error) {
       console.error('Error updating receptionist units:', error);
-      if (!shouldUseLocalFallback(error)) {
+      if (!shouldUseLocalFallback(error) || IS_PROD) {
         return false;
       }
       const updated = receptionists.map((r) =>
@@ -313,7 +328,7 @@ export function UserManagementProvider({ children }: { children: ReactNode }) {
       return true;
     } catch (error) {
       console.error('Error creating unit:', error);
-      if (!shouldUseLocalFallback(error)) {
+      if (!shouldUseLocalFallback(error) || IS_PROD) {
         return false;
       }
       const id = payload.id || payload.slug;
@@ -343,7 +358,7 @@ export function UserManagementProvider({ children }: { children: ReactNode }) {
       return true;
     } catch (error) {
       console.error('Error updating unit:', error);
-      if (!shouldUseLocalFallback(error)) {
+      if (!shouldUseLocalFallback(error) || IS_PROD) {
         return false;
       }
       const next = units.map((u) =>
@@ -361,7 +376,7 @@ export function UserManagementProvider({ children }: { children: ReactNode }) {
       await refreshUnits();
     } catch (error) {
       console.error('Error removing unit:', error);
-      if (!shouldUseLocalFallback(error)) {
+      if (!shouldUseLocalFallback(error) || IS_PROD) {
         throw error;
       }
       const next = units.filter((u) => u.id !== id);
@@ -376,7 +391,7 @@ export function UserManagementProvider({ children }: { children: ReactNode }) {
       await refreshReceptionists();
     } catch (error) {
       console.error('Error removing receptionist:', error);
-      if (!shouldUseLocalFallback(error)) {
+      if (!shouldUseLocalFallback(error) || IS_PROD) {
         throw error;
       }
 
@@ -392,7 +407,7 @@ export function UserManagementProvider({ children }: { children: ReactNode }) {
       return parseReceptionist(receptionist);
     } catch (error) {
       console.error('Error validating receptionist:', error);
-      if (!shouldUseLocalFallback(error)) {
+      if (!shouldUseLocalFallback(error) || IS_PROD) {
         return null;
       }
 
@@ -416,7 +431,7 @@ export function UserManagementProvider({ children }: { children: ReactNode }) {
       return true;
     } catch (error) {
       console.error('Error updating admin credentials:', error);
-      if (!shouldUseLocalFallback(error)) {
+      if (!shouldUseLocalFallback(error) || IS_PROD) {
         return false;
       }
 
@@ -436,7 +451,7 @@ export function UserManagementProvider({ children }: { children: ReactNode }) {
       return true;
     } catch (error) {
       console.error('Error validating admin:', error);
-      if (!shouldUseLocalFallback(error)) {
+      if (!shouldUseLocalFallback(error) || IS_PROD) {
         return false;
       }
 
@@ -449,6 +464,12 @@ export function UserManagementProvider({ children }: { children: ReactNode }) {
       );
     }
   };
+
+  useEffect(() => {
+    refreshReceptionists();
+    refreshUnits();
+    loadAdminCredentials();
+  }, []);
 
   return (
     <UserManagementContext.Provider value={{

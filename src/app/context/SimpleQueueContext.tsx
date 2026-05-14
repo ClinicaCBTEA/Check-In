@@ -24,7 +24,7 @@ export interface QueueEntry {
 
 interface SimpleQueueContextType {
   queue: QueueEntry[];
-  /** Primeiro paciente “em atendimento” entre as chaves por unidade (útil para debug). */
+  /** Primeiro paciente em atendimento entre as unidades monitoradas (painel interno). */
   currentPatient: QueueEntry | null;
   currentByUnit: Record<string, QueueEntry | null>;
   addToQueue: (patientName: string, phone: string, unitId: string) => Promise<string>;
@@ -39,6 +39,10 @@ interface SimpleQueueContextType {
 }
 
 const SimpleQueueContext = createContext<SimpleQueueContextType | undefined>(undefined);
+
+const SS_QUEUE_KEY = 'cbtea_queue_backup';
+const SS_CURRENT_KEY = 'cbtea_currentPatient_by_unit_backup';
+const IS_PROD = import.meta.env.PROD;
 
 function parseQueueEntry(entry: any): QueueEntry {
   return {
@@ -105,14 +109,24 @@ export function SimpleQueueProvider({ children }: { children: ReactNode }) {
       setCurrentByUnit(currentMap);
       setCurrentPatient(firstCurrentPatient(currentMap));
 
-      localStorage.setItem('queue_backup', JSON.stringify(parsedQueue));
-      localStorage.setItem('currentPatient_by_unit_backup', JSON.stringify(currentMap));
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem(SS_QUEUE_KEY, JSON.stringify(parsedQueue));
+          sessionStorage.setItem(SS_CURRENT_KEY, JSON.stringify(currentMap));
+        } catch {
+          /* ignore quota / private mode */
+        }
+      }
     } catch (error) {
       console.error('Error fetching queue from server:', error);
-      console.warn('🚨 Servidor não disponível - usando dados locais');
+      if (!IS_PROD) {
+        console.warn('Servidor indisponível — usando cópia da sessão atual, se existir.');
+      }
 
-      const queueBackup = localStorage.getItem('queue_backup');
-      const currentBackup = localStorage.getItem('currentPatient_by_unit_backup');
+      const queueBackup =
+        typeof window !== 'undefined' ? sessionStorage.getItem(SS_QUEUE_KEY) : null;
+      const currentBackup =
+        typeof window !== 'undefined' ? sessionStorage.getItem(SS_CURRENT_KEY) : null;
 
       if (queueBackup) {
         try {
@@ -151,6 +165,10 @@ export function SimpleQueueProvider({ children }: { children: ReactNode }) {
       await refreshQueue();
       return newEntry.id;
     } catch (error) {
+      console.error('Error adding patient to queue:', error);
+      if (IS_PROD) {
+        throw error;
+      }
       console.warn('Server unavailable, using local mode');
 
       const id = `patient-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -167,7 +185,11 @@ export function SimpleQueueProvider({ children }: { children: ReactNode }) {
 
       const updatedQueue = [...queue, newEntry];
       setQueue(updatedQueue);
-      localStorage.setItem('queue_backup', JSON.stringify(updatedQueue));
+      try {
+        sessionStorage.setItem(SS_QUEUE_KEY, JSON.stringify(updatedQueue));
+      } catch {
+        /* ignore */
+      }
 
       return id;
     }
@@ -346,7 +368,11 @@ export function SimpleQueueProvider({ children }: { children: ReactNode }) {
         const otherStatuses = queue.filter((p) => p.status !== 'waiting');
         const reorderedWaiting = [patient, ...waitingPatients.filter((p) => p.id !== patientId)];
         setQueue([...reorderedWaiting, ...otherStatuses]);
-        localStorage.setItem('queue_backup', JSON.stringify([...reorderedWaiting, ...otherStatuses]));
+        try {
+          sessionStorage.setItem(SS_QUEUE_KEY, JSON.stringify([...reorderedWaiting, ...otherStatuses]));
+        } catch {
+          /* ignore */
+        }
       }
     }
   };
