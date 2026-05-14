@@ -36,7 +36,7 @@ export default function DebugMenu() {
     const randomPhone = `(${Math.floor(Math.random() * 90 + 10)}) ${Math.floor(Math.random() * 90000 + 10000)}-${Math.floor(Math.random() * 9000 + 1000)}`;
 
     try {
-      await addToQueue(randomName, randomPhone);
+      await addToQueue(randomName, randomPhone, 'unidadebarra');
     } catch (error) {
       console.error('Error adding mock patient:', error);
     }
@@ -97,15 +97,15 @@ export default function DebugMenu() {
               Navegação Rápida
             </h3>
             <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" size="sm" onClick={() => handleNavigate('/')}>
+              <Button variant="outline" size="sm" onClick={() => handleNavigate('/unidadebarra')}>
                 <UserPlus className="w-4 h-4 mr-2" />
                 Cadastro
               </Button>
-              <Button variant="outline" size="sm" onClick={() => handleNavigate('/qrcode')}>
+              <Button variant="outline" size="sm" onClick={() => handleNavigate('/unidadebarra/qrcode')}>
                 <QrCode className="w-4 h-4 mr-2" />
                 QR Code
               </Button>
-              <Button variant="outline" size="sm" onClick={() => handleNavigate('/fila')}>
+              <Button variant="outline" size="sm" onClick={() => handleNavigate('/unidadebarra/fila')}>
                 <Users className="w-4 h-4 mr-2" />
                 Fila
               </Button>

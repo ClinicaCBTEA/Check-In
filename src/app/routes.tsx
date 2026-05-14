@@ -8,6 +8,7 @@ import ReceptionScreenV2 from './components/v2/ReceptionScreenV2';
 import LogScreenV2Enhanced from './components/v2/LogScreenV2Enhanced';
 import AdminLoginScreenV2 from './components/v2/AdminLoginScreenV2';
 import AdminPanelV2 from './components/v2/AdminPanelV2';
+import WelcomeHome from './components/v2/WelcomeHome';
 
 export const router = createBrowserRouter([
   {
@@ -15,7 +16,7 @@ export const router = createBrowserRouter([
     children: [
       {
         path: '/',
-        Component: RegisterScreenV2,
+        Component: WelcomeHome,
       },
       {
         path: '/qrcode',
@@ -45,6 +46,18 @@ export const router = createBrowserRouter([
         path: '/admin',
         Component: AdminPanelV2,
       },
-    ]
+      {
+        path: '/:unitSlug/qrcode',
+        Component: QrCodeScreenV2,
+      },
+      {
+        path: '/:unitSlug/fila',
+        Component: QueuePositionScreenV2,
+      },
+      {
+        path: '/:unitSlug',
+        Component: RegisterScreenV2,
+      },
+    ],
   },
 ]);

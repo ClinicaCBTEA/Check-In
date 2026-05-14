@@ -5,6 +5,8 @@ import { Label } from '../ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { useSimpleQueue } from '../../context/SimpleQueueContext';
+import { useAuth } from '../../context/AuthContext';
+import { useUserManagement } from '../../context/UserManagementContext';
 import { ArrowLeft, Clock, Bell, Phone, Download, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import ProtectedRoute from './ProtectedRoute';
@@ -13,17 +15,29 @@ import logo from '../../../imports/image.png';
 
 function LogScreenEnhancedContent() {
   const { getLogEntries } = useSimpleQueue();
+  const { receptionist } = useAuth();
+  const { units } = useUserManagement();
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split('T')[0]
   );
 
-  const allEntries = getLogEntries();
+  const unitLabel = (id: string) => units.find((u) => u.id === id)?.name || id;
 
-  // Filtrar por data
-  const filteredEntries = allEntries.filter(entry => {
+  const allEntries = getLogEntries();
+  const allowedUnitIds = receptionist?.unitIds;
+
+  // Filtrar por data e por unidades alocadas ao recepcionista
+  const filteredEntries = allEntries.filter((entry) => {
     const entryDate = entry.checkInTime.toISOString().split('T')[0];
-    return entryDate === selectedDate;
+    if (entryDate !== selectedDate) {
+      return false;
+    }
+    if (allowedUnitIds && allowedUnitIds.length > 0) {
+      const uid = entry.unitId || 'unidadebarra';
+      return allowedUnitIds.includes(uid);
+    }
+    return true;
   });
 
   const formatTime = (date: Date) => {
@@ -49,6 +63,7 @@ function LogScreenEnhancedContent() {
       const baseData = {
         'Paciente': entry.patientName,
         'Telefone': entry.phone,
+        'Unidade': unitLabel(entry.unitId || 'unidadebarra'),
         'Data Check-in': formatDate(entry.checkInTime),
         'Hora Check-in': formatTime(entry.checkInTime),
         'Total de Chamadas': callHistory.length,
@@ -74,6 +89,7 @@ function LogScreenEnhancedContent() {
     const colWidths = [
       { wch: 25 }, // Paciente
       { wch: 15 }, // Telefone
+      { wch: 22 }, // Unidade
       { wch: 12 }, // Data Check-in
       { wch: 12 }, // Hora Check-in
       { wch: 18 }, // Total de Chamadas
@@ -105,7 +121,9 @@ function LogScreenEnhancedContent() {
           <img src={logo} alt="CBTEA Logo" className="h-14" />
           <div className="flex-1">
             <h1 className="text-4xl font-bold text-gray-800">Log de Atendimentos</h1>
-            <p className="text-gray-600 mt-1">Registro de check-in e chamadas</p>
+            <p className="text-gray-600 mt-1">
+              Registro de check-in e chamadas nas suas unidades alocadas
+            </p>
           </div>
           <Button onClick={exportToExcel} disabled={filteredEntries.length === 0}>
             <Download className="w-4 h-4 mr-2" />
@@ -215,6 +233,9 @@ function LogScreenEnhancedContent() {
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                           <h3 className="font-semibold text-lg">{entry.patientName}</h3>
+                          <Badge variant="outline" className="text-xs">
+                            {unitLabel(entry.unitId || 'unidadebarra')}
+                          </Badge>
                           <Badge variant={entry.status === 'waiting' ? 'secondary' : 'default'}>
                             {entry.status === 'in-service' ? 'Em Atendimento' : entry.status === 'completed' ? 'Concluído' : 'Aguardando'}
                           </Badge>

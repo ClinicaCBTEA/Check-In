@@ -3,15 +3,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Badge } from '../ui/badge';
 import { useSimpleQueue } from '../../context/SimpleQueueContext';
 import { useAuth } from '../../context/AuthContext';
+import { useUserManagement } from '../../context/UserManagementContext';
 import { Bell, Clock, Users, Phone, ChevronUp, LogOut, RotateCcw, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import ProtectedRoute from './ProtectedRoute';
 import logo from '../../../imports/image.png';
 
 function ReceptionScreenContent() {
-  const { queue, currentPatient, callNext, callSpecificPatient, completeService, returnToQueue, moveToFront } = useSimpleQueue();
-  const { logout, currentUser } = useAuth();
+  const { queue, callNext, callSpecificPatient, completeService, returnToQueue, moveToFront } = useSimpleQueue();
+  const { logout, currentUser, receptionist } = useAuth();
+  const { units } = useUserManagement();
   const navigate = useNavigate();
+
+  const unitLabel = (id: string) => units.find((u) => u.id === id)?.name || id;
 
   const handleLogout = () => {
     logout();
@@ -53,6 +57,16 @@ function ReceptionScreenContent() {
             <div>
               <h1 className="text-4xl font-bold text-gray-800">Painel da Recepção</h1>
               <p className="text-gray-600 mt-2">Gerenciamento de chamadas</p>
+              {receptionist?.unitIds?.length ? (
+                <p className="text-sm text-teal-800 mt-2">
+                  Unidades:{' '}
+                  {receptionist.unitIds.map((id) => (
+                    <Badge key={id} variant="secondary" className="mr-1 mt-1">
+                      {unitLabel(id)}
+                    </Badge>
+                  ))}
+                </p>
+              ) : null}
             </div>
           </div>
           <div className="flex gap-2">
@@ -140,6 +154,7 @@ function ReceptionScreenContent() {
                         <p className="text-xs text-green-600 mt-1">
                           Chamado por {patient.calledBy} às {patient.calledTime?.toLocaleTimeString('pt-BR')}
                         </p>
+                        <p className="text-xs text-green-700 mt-1">Unidade: {unitLabel(patient.unitId)}</p>
                       </div>
                       <Badge className="bg-green-600">Atendendo</Badge>
                     </div>
@@ -206,6 +221,9 @@ function ReceptionScreenContent() {
                   <p className="text-xs text-blue-600 mt-2">
                     Check-in: {waitingPatients[0].checkInTime.toLocaleTimeString('pt-BR')}
                   </p>
+                  <p className="text-xs text-blue-700 mt-1">
+                    Unidade: {unitLabel(waitingPatients[0].unitId)}
+                  </p>
                 </div>
               ) : (
                 <div className="text-center py-4 text-gray-500">
@@ -247,6 +265,7 @@ function ReceptionScreenContent() {
                         <div>
                           <p className="font-semibold">{patient.patientName}</p>
                           <p className="text-xs text-gray-500">{patient.phone}</p>
+                          <p className="text-xs text-teal-700 mt-0.5">{unitLabel(patient.unitId)}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">

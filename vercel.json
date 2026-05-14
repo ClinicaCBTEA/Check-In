@@ -3,12 +3,16 @@
   "buildCommand": "pnpm build",
   "outputDirectory": "dist",
   "rewrites": [
+    { "source": "/", "destination": "/index.html" },
     { "source": "/qrcode", "destination": "/index.html" },
     { "source": "/fila", "destination": "/index.html" },
     { "source": "/login", "destination": "/index.html" },
     { "source": "/recepcao", "destination": "/index.html" },
     { "source": "/log", "destination": "/index.html" },
     { "source": "/admin", "destination": "/index.html" },
-    { "source": "/admin/:path*", "destination": "/index.html" }
+    { "source": "/admin/:path*", "destination": "/index.html" },
+    { "source": "/:unitSlug/qrcode", "destination": "/index.html" },
+    { "source": "/:unitSlug/fila", "destination": "/index.html" },
+    { "source": "/:unitSlug", "destination": "/index.html" }
   ]
 }

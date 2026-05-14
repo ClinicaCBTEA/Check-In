@@ -12,15 +12,21 @@ export default function QueuePositionScreenV2() {
   const navigate = useNavigate();
   const { queue, getPatientPosition, returnToQueue } = useSimpleQueue();
   const [patientId, setPatientId] = useState<string>('');
+  const [unitId, setUnitId] = useState<string>('');
+  const [unitSlug, setUnitSlug] = useState<string>('');
   const [position, setPosition] = useState<number | null>(null);
   const [isReturning, setIsReturning] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const previousStatusRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const id = location.state?.patientId;
-    if (id) {
+    const id = location.state?.patientId as string | undefined;
+    const uid = location.state?.unitId as string | undefined;
+    const slug = location.state?.unitSlug as string | undefined;
+    if (id && uid) {
       setPatientId(id);
+      setUnitId(uid);
+      setUnitSlug(slug || uid);
     } else {
       navigate('/');
     }
@@ -41,11 +47,11 @@ export default function QueuePositionScreenV2() {
   }, []);
 
   useEffect(() => {
-    if (patientId) {
-      const pos = getPatientPosition(patientId);
+    if (patientId && unitId) {
+      const pos = getPatientPosition(patientId, unitId);
       setPosition(pos);
     }
-  }, [patientId, queue, getPatientPosition]);
+  }, [patientId, unitId, queue, getPatientPosition]);
 
   // Detect status change and trigger notification
   useEffect(() => {
@@ -101,7 +107,7 @@ export default function QueuePositionScreenV2() {
   }, [patientId, queue, notificationPermission]);
 
   const currentPatientData = queue.find(p => p.id === patientId);
-  const waitingPatients = queue.filter(p => p.status === 'waiting');
+  const waitingPatients = queue.filter((p) => p.status === 'waiting' && (!unitId || p.unitId === unitId));
   const isInService = currentPatientData?.status === 'in-service';
   const isCompleted = currentPatientData?.status === 'completed';
 
@@ -206,7 +212,13 @@ export default function QueuePositionScreenV2() {
                   <div className="flex items-center justify-center gap-2 sm:gap-3 mb-2 flex-wrap">
                     <Users className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-700" />
                     <p className="text-base sm:text-lg md:text-xl font-semibold text-emerald-900">
-                      {waitingPatients.length} {waitingPatients.length === 1 ? 'pessoa' : 'pessoas'} na fila
+                      {
+                        queue.filter((p) => p.status === 'waiting' && p.unitId === unitId).length
+                      }{' '}
+                      {queue.filter((p) => p.status === 'waiting' && p.unitId === unitId).length === 1
+                        ? 'pessoa'
+                        : 'pessoas'}{' '}
+                      na fila desta unidade
                     </p>
                   </div>
                   <p className="text-xs sm:text-sm text-emerald-700">Aguardando atendimento</p>
@@ -254,7 +266,7 @@ export default function QueuePositionScreenV2() {
               variant="outline"
               size="lg"
               className="bg-white text-sm sm:text-base"
-              onClick={() => navigate('/')}
+              onClick={() => navigate(unitSlug ? `/${unitSlug}` : '/')}
             >
               Voltar ao Início
             </Button>

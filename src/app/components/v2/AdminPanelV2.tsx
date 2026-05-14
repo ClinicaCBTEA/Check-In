@@ -3,29 +3,79 @@ import { useNavigate } from 'react-router';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { Checkbox } from '../ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Badge } from '../ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
 import { useUserManagement } from '../../context/UserManagementContext';
-import { Shield, UserPlus, Trash2, LogOut, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { Shield, UserPlus, Trash2, LogOut, AlertCircle, CheckCircle, Loader2, Building2, Pencil } from 'lucide-react';
 import logo from '../../../imports/image.png';
 
 export default function AdminPanelV2() {
   const navigate = useNavigate();
-  const { receptionists, adminCredentials, addReceptionist, removeReceptionist, updateAdminCredentials } = useUserManagement();
+  const {
+    units,
+    receptionists,
+    adminCredentials,
+    addReceptionist,
+    removeReceptionist,
+    updateReceptionistUnits,
+    updateAdminCredentials,
+    addUnit,
+    updateUnitRecord,
+    removeUnit,
+    refreshUnits,
+  } = useUserManagement();
 
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [selectedUnitIds, setSelectedUnitIds] = useState<string[]>([]);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [isSubmittingReceptionist, setIsSubmittingReceptionist] = useState(false);
+
+  const [newUnitSlug, setNewUnitSlug] = useState('');
+  const [newUnitName, setNewUnitName] = useState('');
+  const [newUnitAddress, setNewUnitAddress] = useState('');
+  const [isSubmittingUnit, setIsSubmittingUnit] = useState(false);
+
+  const [editUnitId, setEditUnitId] = useState<string | null>(null);
+  const [editUnitName, setEditUnitName] = useState('');
+  const [editUnitAddress, setEditUnitAddress] = useState('');
+  const [editUnitSlug, setEditUnitSlug] = useState('');
+
+  const [allocationOpen, setAllocationOpen] = useState(false);
+  const [allocationRecId, setAllocationRecId] = useState<string | null>(null);
+  const [allocationRecName, setAllocationRecName] = useState('');
+  const [allocationUnits, setAllocationUnits] = useState<string[]>([]);
+  const [isSavingAllocation, setIsSavingAllocation] = useState(false);
 
   // Estados para alterar credenciais admin
   const [newAdminUsername, setNewAdminUsername] = useState('');
   const [newAdminPassword, setNewAdminPassword] = useState('');
   const [confirmAdminPassword, setConfirmAdminPassword] = useState('');
   const [isSubmittingAdmin, setIsSubmittingAdmin] = useState(false);
+
+  useEffect(() => {
+    setSelectedUnitIds((prev) => {
+      if (prev.length > 0) {
+        return prev;
+      }
+      if (units.length > 0) {
+        return [units[0].id];
+      }
+      return [];
+    });
+  }, [units]);
 
   useEffect(() => {
     const isAdmin = sessionStorage.getItem('adminAuth');
@@ -39,6 +89,58 @@ export default function AdminPanelV2() {
     navigate('/admin/login');
   };
 
+  const toggleNewRecUnit = (id: string) => {
+    setSelectedUnitIds((prev) => {
+      if (prev.includes(id)) {
+        const next = prev.filter((x) => x !== id);
+        return next.length > 0 ? next : prev;
+      }
+      return [...prev, id];
+    });
+  };
+
+  const toggleAllocationUnit = (id: string) => {
+    setAllocationUnits((prev) => {
+      if (prev.includes(id)) {
+        const next = prev.filter((x) => x !== id);
+        return next.length > 0 ? next : prev;
+      }
+      return [...prev, id];
+    });
+  };
+
+  const openAllocation = (id: string, recName: string, current: string[]) => {
+    setAllocationRecId(id);
+    setAllocationRecName(recName);
+    setAllocationUnits(current.length > 0 ? [...current] : [units[0]?.id].filter(Boolean) as string[]);
+    setAllocationOpen(true);
+  };
+
+  const handleSaveAllocation = async () => {
+    if (!allocationRecId || allocationUnits.length === 0) {
+      return;
+    }
+    setIsSavingAllocation(true);
+    setErrorMessage('');
+    setSuccessMessage('');
+    try {
+      const ok = await updateReceptionistUnits(allocationRecId, allocationUnits);
+      if (ok) {
+        setSuccessMessage(
+          `Unidades atualizadas para "${allocationRecName}". O recepcionista deve sair e entrar de novo na recepção para aplicar na sessão atual.`
+        );
+        setAllocationOpen(false);
+      } else {
+        setErrorMessage('Não foi possível atualizar as unidades.');
+      }
+    } catch (e) {
+      console.error(e);
+      setErrorMessage('Erro ao salvar alocação de unidades.');
+    } finally {
+      setIsSavingAllocation(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -48,23 +150,101 @@ export default function AdminPanelV2() {
 
     setSuccessMessage('');
     setErrorMessage('');
+
+    if (selectedUnitIds.length === 0) {
+      setErrorMessage('Selecione ao menos uma unidade para o recepcionista.');
+      return;
+    }
+
     setIsSubmittingReceptionist(true);
 
     try {
-      const success = await addReceptionist(name, username, password);
+      const success = await addReceptionist(name, username, password, selectedUnitIds);
       if (success) {
         setSuccessMessage(`Recepcionista "${name}" cadastrado com sucesso!`);
         setName('');
         setUsername('');
         setPassword('');
       } else {
-        setErrorMessage('Erro: Nome de usuário já existe');
+        setErrorMessage('Erro: Nome de usuário já existe ou dados inválidos');
       }
     } catch (error) {
       console.error('Error adding receptionist:', error);
       setErrorMessage('Erro ao cadastrar recepcionista. Tente novamente.');
     } finally {
       setIsSubmittingReceptionist(false);
+    }
+  };
+
+  const handleAddUnit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isSubmittingUnit) {
+      return;
+    }
+    setSuccessMessage('');
+    setErrorMessage('');
+    setIsSubmittingUnit(true);
+    try {
+      const slug = newUnitSlug.trim().toLowerCase().replace(/\s+/g, '');
+      const ok = await addUnit({
+        slug,
+        name: newUnitName.trim(),
+        address: newUnitAddress.trim(),
+      });
+      if (ok) {
+        setSuccessMessage(`Unidade "${newUnitName}" cadastrada.`);
+        setNewUnitSlug('');
+        setNewUnitName('');
+        setNewUnitAddress('');
+        await refreshUnits();
+      } else {
+        setErrorMessage('Não foi possível criar a unidade (slug duplicado ou inválido).');
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMessage('Erro ao cadastrar unidade.');
+    } finally {
+      setIsSubmittingUnit(false);
+    }
+  };
+
+  const startEditUnit = (u: { id: string; name: string; address: string; slug: string }) => {
+    setEditUnitId(u.id);
+    setEditUnitName(u.name);
+    setEditUnitAddress(u.address);
+    setEditUnitSlug(u.slug);
+  };
+
+  const handleSaveUnit = async () => {
+    if (!editUnitId) {
+      return;
+    }
+    setErrorMessage('');
+    setSuccessMessage('');
+    const ok = await updateUnitRecord(editUnitId, {
+      name: editUnitName.trim(),
+      address: editUnitAddress.trim(),
+      slug: editUnitSlug.trim().toLowerCase().replace(/\s+/g, ''),
+    });
+    if (ok) {
+      setSuccessMessage('Unidade atualizada.');
+      setEditUnitId(null);
+      await refreshUnits();
+    } else {
+      setErrorMessage('Erro ao atualizar unidade.');
+    }
+  };
+
+  const handleDeleteUnit = async (id: string, unitName: string) => {
+    if (confirm(`Remover a unidade "${unitName}"? Recepcionistas devem ser realocados antes.`)) {
+      try {
+        await removeUnit(id);
+        setSuccessMessage(`Unidade "${unitName}" removida.`);
+        await refreshUnits();
+      } catch (err) {
+        console.error(err);
+        setErrorMessage('Erro ao remover unidade.');
+      }
     }
   };
 
@@ -136,7 +316,7 @@ export default function AdminPanelV2() {
                 <Shield className="w-10 h-10 text-purple-600" />
                 Painel Administrativo
               </h1>
-              <p className="text-gray-600 mt-2">Gerenciamento de recepcionistas</p>
+              <p className="text-gray-600 mt-2">Unidades, endereços, QR Codes e alocação de recepcionistas</p>
             </div>
           </div>
           <Button variant="outline" onClick={handleLogout}>
@@ -158,6 +338,133 @@ export default function AdminPanelV2() {
             <AlertDescription>{errorMessage}</AlertDescription>
           </Alert>
         )}
+
+        <div className="grid md:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-purple-600" />
+                Nova Unidade
+              </CardTitle>
+              <CardDescription>
+                O slug define a URL pública e o caminho do QR Code (ex.: /unidadebarra e /unidadebarra/qrcode).
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleAddUnit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="unitSlug">Slug da URL (ex: unidadebarra)</Label>
+                  <Input
+                    id="unitSlug"
+                    value={newUnitSlug}
+                    onChange={(e) => setNewUnitSlug(e.target.value)}
+                    placeholder="unidadebarra"
+                    disabled={isSubmittingUnit}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="unitName">Nome da unidade</Label>
+                  <Input
+                    id="unitName"
+                    value={newUnitName}
+                    onChange={(e) => setNewUnitName(e.target.value)}
+                    placeholder="Unidade Barra"
+                    disabled={isSubmittingUnit}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="unitAddress">Endereço completo</Label>
+                  <Input
+                    id="unitAddress"
+                    value={newUnitAddress}
+                    onChange={(e) => setNewUnitAddress(e.target.value)}
+                    placeholder="Rua, número, bairro, cidade"
+                    disabled={isSubmittingUnit}
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={isSubmittingUnit}>
+                  {isSubmittingUnit ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    'Cadastrar unidade'
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Unidades cadastradas</CardTitle>
+              <CardDescription>Links de check-in e QR por unidade</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 max-h-[28rem] overflow-y-auto">
+              {units.length === 0 ? (
+                <p className="text-sm text-gray-500">Nenhuma unidade.</p>
+              ) : (
+                units.map((u) => (
+                  <div key={u.id} className="border rounded-lg p-3 space-y-2">
+                    {editUnitId === u.id ? (
+                      <div className="space-y-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Slug (URL)</Label>
+                          <Input value={editUnitSlug} onChange={(e) => setEditUnitSlug(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Nome</Label>
+                          <Input value={editUnitName} onChange={(e) => setEditUnitName(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Endereço</Label>
+                          <Input value={editUnitAddress} onChange={(e) => setEditUnitAddress(e.target.value)} />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" type="button" onClick={handleSaveUnit}>
+                            Salvar
+                          </Button>
+                          <Button size="sm" variant="outline" type="button" onClick={() => setEditUnitId(null)}>
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex justify-between gap-2">
+                          <div>
+                            <p className="font-semibold">{u.name}</p>
+                            <p className="text-xs text-gray-600 mt-1 break-words">{u.address}</p>
+                            <p className="text-xs font-mono text-purple-700 mt-2">
+                              Check-in: /{u.slug} · QR: /{u.slug}/qrcode
+                            </p>
+                          </div>
+                          <div className="flex flex-col gap-1 shrink-0">
+                            <Button size="sm" variant="outline" type="button" onClick={() => startEditUnit(u)}>
+                              Editar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              type="button"
+                              onClick={() => handleDeleteUnit(u.id, u.name)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
         <div className="grid md:grid-cols-2 gap-6">
           <Card>
@@ -209,6 +516,25 @@ export default function AdminPanelV2() {
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <Label>Unidades que este recepcionista atende</Label>
+                  <div className="space-y-2 border rounded-md p-3 max-h-44 overflow-y-auto bg-white">
+                    {units.length === 0 ? (
+                      <p className="text-xs text-gray-500">Cadastre uma unidade ao lado antes de adicionar recepcionistas.</p>
+                    ) : (
+                      units.map((u) => (
+                        <label key={u.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                          <Checkbox
+                            checked={selectedUnitIds.includes(u.id)}
+                            onCheckedChange={() => toggleNewRecUnit(u.id)}
+                          />
+                          <span>{u.name}</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </div>
+
                 <Button type="submit" className="w-full" disabled={isSubmittingReceptionist}>
                   {isSubmittingReceptionist ? (
                     <>
@@ -236,22 +562,43 @@ export default function AdminPanelV2() {
                 {receptionists.map((receptionist) => (
                   <div
                     key={receptionist.id}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition"
+                    className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 p-4 border rounded-lg hover:bg-gray-50 transition"
                   >
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <p className="font-semibold text-lg">{receptionist.name}</p>
                       <p className="text-sm text-gray-600">@{receptionist.username}</p>
                       <p className="text-xs text-gray-500 mt-1">
                         Cadastrado em {receptionist.createdAt.toLocaleDateString('pt-BR')}
                       </p>
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {(receptionist.unitIds || []).map((uid) => (
+                          <Badge key={uid} variant="secondary" className="text-xs">
+                            {units.find((x) => x.id === uid)?.name || uid}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleDelete(receptionist.id, receptionist.name)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="flex gap-2 shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        type="button"
+                        title="Alterar unidades"
+                        onClick={() =>
+                          openAllocation(receptionist.id, receptionist.name, receptionist.unitIds || [])
+                        }
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        type="button"
+                        onClick={() => handleDelete(receptionist.id, receptionist.name)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -345,14 +692,51 @@ export default function AdminPanelV2() {
               <CardTitle>Instruções</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-gray-600">
-              <p>• Os recepcionistas cadastrados aqui poderão fazer login na área de recepção</p>
-              <p>• Cada recepcionista terá acesso ao painel de chamadas e ao log de atendimentos</p>
+              <p>• Cadastre unidades com endereço; cada uma tem URL e QR próprios</p>
+              <p>• Cada recepcionista deve ter ao menos uma unidade alocada — só verá fila e log dessas unidades</p>
+              <p>• Os recepcionistas fazem login na área de recepção com as credenciais definidas aqui</p>
               <p>• O sistema registra qual recepcionista chamou cada paciente</p>
-              <p>• Não é possível que dois recepcionistas chamem o mesmo paciente simultaneamente</p>
               <p className="pt-2 border-t mt-3 text-purple-700 font-semibold">• Mantenha as credenciais de admin seguras e atualizadas regularmente</p>
             </CardContent>
           </Card>
         </div>
+
+        <Dialog open={allocationOpen} onOpenChange={setAllocationOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Unidades — {allocationRecName}</DialogTitle>
+              <DialogDescription>
+                Marque em quais unidades este usuário pode operar o painel da recepção e o log.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 py-2 max-h-60 overflow-y-auto">
+              {units.map((u) => (
+                <label key={u.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={allocationUnits.includes(u.id)}
+                    onCheckedChange={() => toggleAllocationUnit(u.id)}
+                  />
+                  <span>{u.name}</span>
+                </label>
+              ))}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" type="button" onClick={() => setAllocationOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="button" onClick={handleSaveAllocation} disabled={isSavingAllocation}>
+                {isSavingAllocation ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Salvando
+                  </>
+                ) : (
+                  'Salvar'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

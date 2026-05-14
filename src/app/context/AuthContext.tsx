@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { useUserManagement } from './UserManagementContext';
+import { useUserManagement, type Receptionist } from './UserManagementContext';
 
 interface AuthContextType {
   isAuthenticated: boolean;
   currentUser: string | null;
+  receptionist: Receptionist | null;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
 }
@@ -13,13 +14,15 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [receptionist, setReceptionist] = useState<Receptionist | null>(null);
   const { validateReceptionist } = useUserManagement();
 
   const login = async (username: string, password: string): Promise<boolean> => {
-    const receptionist = await validateReceptionist(username, password);
-    if (receptionist) {
+    const rec = await validateReceptionist(username, password);
+    if (rec) {
       setIsAuthenticated(true);
-      setCurrentUser(receptionist.name);
+      setCurrentUser(rec.name);
+      setReceptionist(rec);
       return true;
     }
     return false;
@@ -28,10 +31,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setIsAuthenticated(false);
     setCurrentUser(null);
+    setReceptionist(null);
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, currentUser, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, currentUser, receptionist, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

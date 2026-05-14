@@ -37,14 +37,18 @@ async function apiCall<T>(endpoint: string, options?: RequestInit): Promise<T> {
 
 // ============ QUEUE API ============
 
-export async function fetchQueue() {
-  return apiCall<any[]>('/queue');
+export async function fetchQueue(unitIds?: string[]) {
+  const qs =
+    unitIds && unitIds.length > 0
+      ? `?unitIds=${encodeURIComponent(unitIds.join(','))}`
+      : '';
+  return apiCall<any[]>(`/queue${qs}`);
 }
 
-export async function addPatientToQueue(patientName: string, phone: string) {
+export async function addPatientToQueue(patientName: string, phone: string, unitId: string) {
   return apiCall<any>('/queue', {
     method: 'POST',
-    body: JSON.stringify({ patientName, phone }),
+    body: JSON.stringify({ patientName, phone, unitId }),
   });
 }
 
@@ -61,14 +65,53 @@ export async function deleteQueueEntry(id: string) {
   });
 }
 
-export async function fetchCurrentPatient() {
-  return apiCall<any | null>('/current-patient');
+export async function fetchCurrentPatient(unitId: string) {
+  const qs = `?unitId=${encodeURIComponent(unitId)}`;
+  return apiCall<any | null>(`/current-patient${qs}`);
 }
 
-export async function setCurrentPatient(patient: any) {
+export async function setCurrentPatient(patient: any | null, unitId: string) {
   return apiCall<any>('/current-patient', {
     method: 'POST',
-    body: JSON.stringify({ patient }),
+    body: JSON.stringify({ patient, unitId }),
+  });
+}
+
+// ============ UNITS API ============
+
+export interface UnitDTO {
+  id: string;
+  slug: string;
+  name: string;
+  address: string;
+  createdAt?: string;
+}
+
+export async function fetchUnits() {
+  return apiCall<UnitDTO[]>('/units');
+}
+
+export async function fetchUnitBySlug(slug: string) {
+  return apiCall<UnitDTO>(`/units/by-slug/${encodeURIComponent(slug)}`);
+}
+
+export async function createUnit(payload: { id?: string; slug: string; name: string; address: string }) {
+  return apiCall<UnitDTO>('/units', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateUnit(id: string, updates: { name?: string; address?: string; slug?: string }) {
+  return apiCall<UnitDTO>(`/units/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+}
+
+export async function deleteUnit(id: string) {
+  return apiCall<void>(`/units/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
   });
 }
 
@@ -78,10 +121,25 @@ export async function fetchReceptionists() {
   return apiCall<any[]>('/receptionists');
 }
 
-export async function addReceptionist(name: string, username: string, password: string) {
+export async function addReceptionist(
+  name: string,
+  username: string,
+  password: string,
+  unitIds: string[]
+) {
   return apiCall<any>('/receptionists', {
     method: 'POST',
-    body: JSON.stringify({ name, username, password }),
+    body: JSON.stringify({ name, username, password, unitIds }),
+  });
+}
+
+export async function updateReceptionist(
+  id: string,
+  updates: { name?: string; password?: string; unitIds?: string[] }
+) {
+  return apiCall<any>(`/receptionists/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
   });
 }
 
