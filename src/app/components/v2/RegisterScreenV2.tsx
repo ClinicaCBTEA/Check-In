@@ -145,7 +145,6 @@ export default function RegisterScreenV2() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="aviso">Não feche o seu navegador até finalizar o atendimento!\n</Label>
               <Label htmlFor="name">Nome do Paciente</Label>
               <Input
                 id="name"
@@ -180,6 +179,10 @@ export default function RegisterScreenV2() {
                 <span className="text-sm sm:text-base">Entrar na Fila</span>
               )}
             </Button>
+            <\div>
+            <div className="text-center text-xs sm:text-sm text-gray-500 mt-4">
+              <p>não feche o seu navegador, até concluir o atendimento!</p>
+          </div>
           </form>
         </CardContent>
       </Card>
