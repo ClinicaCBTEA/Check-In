@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router';
+import { useLocation, useNavigate, useParams } from 'react-router';
 import { Button } from '../ui/button';
 import * as api from '../../../utils/api';
 import {
+  AlertCircle,
   Bell,
   BellRing,
   CheckCircle,
+  Home,
   RotateCcw,
   Loader2,
 } from 'lucide-react';
@@ -64,22 +66,34 @@ function storeTrackingSession(session: TrackingSession | null) {
 export default function QueuePositionScreenV2() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { unitSlug: routeUnitSlug } = useParams<{ unitSlug?: string }>();
   const [tracking, setTracking] = useState<TrackingSession | null>(null);
   const [status, setStatus] = useState<api.PatientTrackingDTO | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isReturning, setIsReturning] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [sessionIssue, setSessionIssue] = useState('');
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const previousStatusRef = useRef<string | null>(null);
+
+  const restartPath = useMemo(() => {
+    if (routeUnitSlug) {
+      return `/${routeUnitSlug}`;
+    }
+
+    return tracking?.unitSlug ? `/${tracking.unitSlug}` : '/';
+  }, [routeUnitSlug, tracking?.unitSlug]);
 
   useEffect(() => {
     const patientId = location.state?.patientId as string | undefined;
     const accessToken = location.state?.accessToken as string | undefined;
     const unitId = location.state?.unitId as string | undefined;
     const unitSlug = location.state?.unitSlug as string | undefined;
+    const fallbackPath = routeUnitSlug ? `/${routeUnitSlug}` : '/';
 
     if (patientId && accessToken && unitId && unitSlug) {
       const session = { patientId, accessToken, unitId, unitSlug };
+      setSessionIssue('');
       setTracking(session);
       storeTrackingSession(session);
       return;
@@ -87,12 +101,19 @@ export default function QueuePositionScreenV2() {
 
     const storedSession = loadTrackingSession();
     if (storedSession) {
+      if (routeUnitSlug && storedSession.unitSlug !== routeUnitSlug) {
+        storeTrackingSession(null);
+        navigate(fallbackPath, { replace: true });
+        return;
+      }
+
+      setSessionIssue('');
       setTracking(storedSession);
       return;
     }
 
-    navigate('/');
-  }, [location.state, navigate]);
+    navigate(fallbackPath, { replace: true });
+  }, [location.state, navigate, routeUnitSlug]);
 
   useEffect(() => {
     if (!isNotificationSupported()) {
@@ -110,6 +131,7 @@ export default function QueuePositionScreenV2() {
     }
 
     let cancelled = false;
+    setIsLoading(true);
 
     const refreshStatus = async () => {
       try {
@@ -117,11 +139,24 @@ export default function QueuePositionScreenV2() {
         if (!cancelled) {
           setStatus(nextStatus);
           setErrorMessage('');
+          setSessionIssue('');
           setIsLoading(false);
         }
       } catch (error) {
         console.error('Error fetching patient status:', error);
         if (!cancelled) {
+          const message = error instanceof Error ? error.message : 'Erro ao acompanhar a fila.';
+
+          if (message === 'Patient not found' || message === 'accessToken is required') {
+            storeTrackingSession(null);
+            setTracking(null);
+            setStatus(null);
+            setErrorMessage('');
+            setSessionIssue('Seu acompanhamento da fila expirou ou não está mais disponível. Faça um novo check-in para continuar.');
+            setIsLoading(false);
+            return;
+          }
+
           setErrorMessage('N\u00E3o foi poss\u00EDvel atualizar sua posi\u00E7\u00E3o agora. Tentaremos novamente automaticamente.');
           setIsLoading(false);
         }
@@ -217,6 +252,30 @@ export default function QueuePositionScreenV2() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100 p-4">
         <Loader2 className="w-10 h-10 animate-spin text-emerald-600" />
+      </div>
+    );
+  }
+
+  if (sessionIssue) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100 p-4">
+        <div className="w-full max-w-xl rounded-3xl bg-white p-6 sm:p-10 shadow-2xl text-center">
+          <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-amber-100">
+            <AlertCircle className="h-10 w-10 text-amber-600" />
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Acompanhamento indisponível</h1>
+          <p className="mt-3 text-sm sm:text-base text-gray-600">{sessionIssue}</p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <Button type="button" onClick={() => window.location.reload()}>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Atualizar página
+            </Button>
+            <Button type="button" variant="outline" onClick={() => navigate(restartPath, { replace: true })}>
+              <Home className="mr-2 h-4 w-4" />
+              Fazer novo check-in
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
