@@ -160,7 +160,12 @@ export async function addPatientToQueue(
 
 export async function fetchPatientStatus(patientId: string, accessToken: string) {
   return apiCall<PatientTrackingDTO>(
-    `/patient/${encodeURIComponent(patientId)}/status?accessToken=${encodeURIComponent(accessToken)}`,
+    `/patient/${encodeURIComponent(patientId)}/status`,
+    {
+      headers: {
+        'x-patient-access-token': accessToken,
+      },
+    },
   );
 }
 

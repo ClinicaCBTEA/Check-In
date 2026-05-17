@@ -28,7 +28,7 @@ export default function RegisterScreenV2() {
 
     async function load() {
       if (!unitSlug || RESERVED.has(unitSlug.toLowerCase())) {
-        setLoadError('Unidade inválida ou URL reservada.');
+        setLoadError('Unidade inv\u00E1lida ou URL reservada.');
         setUnit(null);
         setLoadingUnit(false);
         return;
@@ -43,7 +43,7 @@ export default function RegisterScreenV2() {
         }
       } catch {
         if (!cancelled) {
-          setLoadError('Unidade não encontrada. Verifique o link ou o QR Code.');
+          setLoadError('Unidade n\u00E3o encontrada. Verifique o link ou o QR Code.');
           setUnit(null);
         }
       } finally {
@@ -113,12 +113,12 @@ export default function RegisterScreenV2() {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <img src={logo} alt="CBTEA Logo" className="h-12 mx-auto mb-3" />
-            <CardTitle className="text-xl">Check-in indisponível</CardTitle>
-            <CardDescription>{loadError || 'Unidade não encontrada.'}</CardDescription>
+            <CardTitle className="text-xl">Check-in indispon\u00EDvel</CardTitle>
+            <CardDescription>{loadError || 'Unidade n\u00E3o encontrada.'}</CardDescription>
           </CardHeader>
           <CardContent>
             <Button className="w-full" variant="outline" onClick={() => navigate('/')}>
-              Voltar ao início
+              Voltar ao in\u00EDcio
             </Button>
           </CardContent>
         </Card>
@@ -179,7 +179,10 @@ export default function RegisterScreenV2() {
                 <span className="text-sm sm:text-base">Entrar na Fila</span>
               )}
             </Button>
-            <div className="text-center text-xs sm:text-sm text-gray-500 mt-4"> <p>Não feche o seu navegador, até concluir o atendimento!</p></div>
+            <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-center text-xs sm:text-sm text-blue-900">
+              <p className="font-semibold">Mantenha esta tela aberta at&eacute; a conclus&atilde;o do atendimento.</p>
+              <p className="mt-1 text-blue-800">O aviso da sua vez aparecer&aacute; aqui e na pr&oacute;xima tela de acompanhamento.</p>
+            </div>
           </form>
         </CardContent>
       </Card>

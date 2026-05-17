@@ -122,7 +122,7 @@ export default function QueuePositionScreenV2() {
       } catch (error) {
         console.error('Error fetching patient status:', error);
         if (!cancelled) {
-          setErrorMessage('Não foi possível atualizar sua posição agora. Tentaremos novamente automaticamente.');
+          setErrorMessage('N\u00E3o foi poss\u00EDvel atualizar sua posi\u00E7\u00E3o agora. Tentaremos novamente automaticamente.');
           setIsLoading(false);
         }
       }
@@ -147,7 +147,7 @@ export default function QueuePositionScreenV2() {
       playNotificationSound();
 
       if (notificationPermission === 'granted') {
-        showNotification('É a sua vez!', {
+        showNotification('\u00C9 a sua vez!', {
           body: 'Por favor, dirija-se ao atendimento agora.',
           icon: logo,
           badge: logo,
@@ -161,7 +161,7 @@ export default function QueuePositionScreenV2() {
         const originalTitle = document.title;
         let isOriginal = true;
         const titleBlinkInterval = window.setInterval(() => {
-          document.title = isOriginal ? 'É SUA VEZ!' : originalTitle;
+          document.title = isOriginal ? '\u00C9 SUA VEZ!' : originalTitle;
           isOriginal = !isOriginal;
         }, 1000);
 
@@ -242,11 +242,11 @@ export default function QueuePositionScreenV2() {
               <div className="bg-blue-100 rounded-full w-20 h-20 sm:w-32 sm:h-32 mx-auto mb-4 sm:mb-6 flex items-center justify-center">
                 <CheckCircle className="w-12 h-12 sm:w-20 sm:h-20 text-blue-600" />
               </div>
-              <p className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-blue-700 mb-3 sm:mb-4 leading-tight">Atendimento Concluído!</p>
+              <p className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-blue-700 mb-3 sm:mb-4 leading-tight">Atendimento Conclu&iacute;do!</p>
               <p className="text-lg sm:text-xl md:text-2xl text-blue-600 font-semibold mb-4 sm:mb-6">Obrigado pela visita</p>
               <div className="mt-4 sm:mt-8 bg-blue-50 rounded-xl p-4 sm:p-6">
                 <p className="text-base sm:text-lg text-blue-800 mb-3 sm:mb-4">Seu atendimento foi finalizado com sucesso.</p>
-                <p className="text-sm text-blue-700 mb-4 sm:mb-6">Se precisar retornar, você pode entrar novamente na fila pelo botão abaixo.</p>
+                <p className="text-sm text-blue-700 mb-4 sm:mb-6">Se precisar retornar, voc&ecirc; pode entrar novamente na fila pelo bot&atilde;o abaixo.</p>
                 <Button onClick={handleReturnToQueue} disabled={isReturning} size="lg" className="w-full sm:max-w-xs">
                   {isReturning ? (
                     <>
@@ -267,10 +267,10 @@ export default function QueuePositionScreenV2() {
               <div className="bg-green-100 rounded-full w-20 h-20 sm:w-32 sm:h-32 mx-auto mb-4 sm:mb-6 flex items-center justify-center">
                 <Bell className="w-12 h-12 sm:w-20 sm:h-20 text-green-600" />
               </div>
-              <p className="text-4xl sm:text-5xl md:text-6xl font-black text-green-700 mb-3 sm:mb-4 leading-tight">É a sua vez!</p>
+              <p className="text-4xl sm:text-5xl md:text-6xl font-black text-green-700 mb-3 sm:mb-4 leading-tight">&Eacute; a sua vez!</p>
               <p className="text-lg sm:text-xl md:text-2xl text-green-600 font-semibold">Dirija-se ao atendimento</p>
               <div className="mt-4 sm:mt-8 bg-green-50 rounded-xl p-3 sm:p-4">
-                <p className="text-base sm:text-lg text-green-800">Por favor, apresente-se na recepção</p>
+                <p className="text-base sm:text-lg text-green-800">Por favor, apresente-se na recep&ccedil;&atilde;o</p>
               </div>
             </div>
           ) : (
@@ -281,7 +281,7 @@ export default function QueuePositionScreenV2() {
 
               <div className="p-6 sm:p-12">
                 <div className="text-center mb-6 sm:mb-8">
-                  <p className="text-lg sm:text-2xl text-gray-600 mb-3 sm:mb-4">Sua posição:</p>
+                  <p className="text-lg sm:text-2xl text-gray-600 mb-3 sm:mb-4">Sua posi&ccedil;&atilde;o:</p>
                   <div className="bg-gradient-to-br from-emerald-400 to-green-500 rounded-full w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 mx-auto flex items-center justify-center shadow-xl">
                     <p className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-black text-white drop-shadow-lg">
                       {position ?? '-'}
@@ -302,7 +302,10 @@ export default function QueuePositionScreenV2() {
                 <div className="mt-6 sm:mt-8 bg-blue-50 border-2 border-blue-200 rounded-xl p-4 sm:p-6 text-center">
                   <Bell className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 sm:mb-3 text-blue-600" />
                   <p className="text-base sm:text-lg font-semibold text-blue-900 mb-1">Fique atento!</p>
-                  <p className="text-sm sm:text-base text-blue-700">Você será avisado nesta tela quando chegar sua vez.</p>
+                  <p className="text-sm sm:text-base text-blue-700">Voc&ecirc; ser&aacute; avisado nesta tela quando chegar sua vez.</p>
+                  <p className="mt-2 text-xs sm:text-sm text-blue-800">
+                    Mantenha esta p&aacute;gina aberta at&eacute; a conclus&atilde;o do atendimento. N&atilde;o feche nem atualize o navegador durante a espera.
+                  </p>
                 </div>
 
                 {isNotificationSupported() && (
@@ -310,7 +313,7 @@ export default function QueuePositionScreenV2() {
                     {notificationPermission === 'granted' ? (
                       <div className="bg-green-50 border-2 border-green-300 rounded-xl p-3 sm:p-4 flex items-center justify-center gap-2">
                         <BellRing className="w-5 h-5 text-green-600" />
-                        <p className="text-xs sm:text-sm text-green-800 font-medium">Notificações habilitadas</p>
+                        <p className="text-xs sm:text-sm text-green-800 font-medium">Notifica&ccedil;&otilde;es habilitadas</p>
                       </div>
                     ) : (
                       <Button
@@ -319,7 +322,7 @@ export default function QueuePositionScreenV2() {
                         className="w-full border-2 border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900"
                       >
                         <BellRing className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                        <span className="text-sm sm:text-base">Habilitar Notificações</span>
+                        <span className="text-sm sm:text-base">Habilitar Notifica&ccedil;&otilde;es</span>
                       </Button>
                     )}
                   </div>
@@ -335,7 +338,7 @@ export default function QueuePositionScreenV2() {
               className="bg-white text-sm sm:text-base"
               onClick={() => navigate(backPath)}
             >
-              Voltar ao Início
+              Voltar ao In&iacute;cio
             </Button>
           </div>
         </div>

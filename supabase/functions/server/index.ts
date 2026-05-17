@@ -57,6 +57,19 @@ interface StoredAdminCredentials {
   passwordSalt?: string;
 }
 
+interface BootstrapAdminCredentials {
+  username: string;
+  password: string;
+}
+
+interface BootstrapReceptionist {
+  id: string;
+  name: string;
+  username: string;
+  password: string;
+  unitIds: string[];
+}
+
 function getAllowedApiKeys(): string[] {
   const allowedKeys = new Set<string>();
   const publishableKeysRaw = Deno.env.get("SUPABASE_PUBLISHABLE_KEYS");
@@ -126,6 +139,57 @@ function sanitizeAdminCredentials(credentials: StoredAdminCredentials) {
     username: credentials.username,
     passwordConfigured: Boolean(credentials.passwordHash || credentials.password),
   };
+}
+
+function getBootstrapAdminCredentials(): BootstrapAdminCredentials | null {
+  const username = String(Deno.env.get("DEFAULT_ADMIN_USERNAME") || "").trim();
+  const password = String(Deno.env.get("DEFAULT_ADMIN_PASSWORD") || "");
+
+  if (!username && !password) {
+    return null;
+  }
+
+  if (!username || password.length < 6) {
+    console.warn(
+      "Bootstrap admin credentials are incomplete. Set DEFAULT_ADMIN_USERNAME and DEFAULT_ADMIN_PASSWORD with at least 6 characters.",
+    );
+    return null;
+  }
+
+  return { username, password };
+}
+
+function getBootstrapReceptionist(): BootstrapReceptionist | null {
+  const username = String(Deno.env.get("DEFAULT_RECEPTION_USERNAME") || "").trim();
+  const password = String(Deno.env.get("DEFAULT_RECEPTION_PASSWORD") || "");
+  const name = String(Deno.env.get("DEFAULT_RECEPTION_NAME") || "Recepcao Principal").trim();
+
+  if (!username && !password) {
+    return null;
+  }
+
+  if (!username || password.length < 6) {
+    console.warn(
+      "Bootstrap receptionist credentials are incomplete. Set DEFAULT_RECEPTION_USERNAME and DEFAULT_RECEPTION_PASSWORD with at least 6 characters.",
+    );
+    return null;
+  }
+
+  return {
+    id: "rec-bootstrap",
+    name,
+    username,
+    password,
+    unitIds: ["unidadebarra", "unidadesantoamaro", "unidadeinga"],
+  };
+}
+
+function getPatientAccessToken(c: any): string {
+  return String(
+    c.req.header("x-patient-access-token") ||
+      c.req.query("accessToken") ||
+      "",
+  ).trim();
 }
 
 function statusFromError(error: unknown, fallbackStatus = 500) {
@@ -286,11 +350,16 @@ async function ensureAdminCredentialsOrDefault(): Promise<StoredAdminCredentials
     return existing;
   }
 
-  const username = Deno.env.get("DEFAULT_ADMIN_USERNAME") || "admin";
-  const password = Deno.env.get("DEFAULT_ADMIN_PASSWORD") || "admin123";
-  const passwordRecord = await buildPasswordRecord(password);
+  const bootstrapCredentials = getBootstrapAdminCredentials();
+  if (!bootstrapCredentials) {
+    throw new Error(
+      "Admin credentials are not configured. Set DEFAULT_ADMIN_USERNAME and DEFAULT_ADMIN_PASSWORD.",
+    );
+  }
+
+  const passwordRecord = await buildPasswordRecord(bootstrapCredentials.password);
   const credentials: StoredAdminCredentials = {
-    username,
+    username: bootstrapCredentials.username,
     passwordHash: passwordRecord.hash,
     passwordSalt: passwordRecord.salt,
   };
@@ -441,30 +510,6 @@ app.get(`${FUNCTION_PREFIX}/health`, async (c) => {
       },
       500,
     );
-  }
-});
-
-app.get(`${FUNCTION_PREFIX}/debug`, async (c) => {
-  try {
-    const testKey = "debug:test";
-    const testValue = { test: "data", timestamp: new Date().toISOString() };
-
-    await kv.set(testKey, testValue);
-    const readValue = await kv.get(testKey);
-    await kv.del(testKey);
-
-    return c.json({
-      success: true,
-      message: "Database operations working correctly",
-      tests: {
-        write: "ok",
-        read: readValue ? "ok" : "missing",
-        delete: "ok",
-      },
-    });
-  } catch (error) {
-    console.error("Debug endpoint error:", error);
-    return c.json({ success: false, error: String(error) }, 500);
   }
 });
 
@@ -649,7 +694,7 @@ app.post(`${FUNCTION_PREFIX}/queue`, async (c) => {
 app.get(`${FUNCTION_PREFIX}/patient/:id/status`, async (c) => {
   try {
     const id = c.req.param("id");
-    const accessToken = String(c.req.query("accessToken") || "").trim();
+    const accessToken = getPatientAccessToken(c);
     if (!accessToken) {
       return c.json({ success: false, error: "accessToken is required" }, 400);
     }
@@ -1208,8 +1253,6 @@ app.put(`${FUNCTION_PREFIX}/admin/credentials`, async (c) =>
 
 async function initializeDefaultData() {
   try {
-    await ensureAdminCredentialsOrDefault();
-
     const defaultUnits = [
       {
         id: "unidadebarra",
@@ -1241,19 +1284,42 @@ async function initializeDefaultData() {
       }
     }
 
+    const existingAdminCredentials = await getStoredAdminCredentials();
+    const bootstrapAdmin = getBootstrapAdminCredentials();
+    if (!existingAdminCredentials && bootstrapAdmin) {
+      const passwordRecord = await buildPasswordRecord(bootstrapAdmin.password);
+      await kv.set("admin:credentials", {
+        username: bootstrapAdmin.username,
+        passwordHash: passwordRecord.hash,
+        passwordSalt: passwordRecord.salt,
+      });
+    } else if (!existingAdminCredentials) {
+      console.warn(
+        "Admin bootstrap credentials were not configured. Set DEFAULT_ADMIN_USERNAME and DEFAULT_ADMIN_PASSWORD before first login.",
+      );
+    }
+
     const existingReceptionists = (await kv.getByPrefix("receptionist:")) as StoredReceptionist[];
     if (existingReceptionists.length === 0) {
-      const defaultPasswordRecord = await buildPasswordRecord("cbtea2024");
-      await kv.set("receptionist:rec-1", {
-        id: "rec-1",
-        name: "Recepcao Principal",
-        username: "recepcao",
-        passwordHash: defaultPasswordRecord.hash,
-        passwordSalt: defaultPasswordRecord.salt,
-        unitIds: ["unidadebarra", "unidadesantoamaro", "unidadeinga"],
-        createdAt: new Date("2024-01-01").toISOString(),
-      });
+      const bootstrapReceptionist = getBootstrapReceptionist();
+      if (bootstrapReceptionist) {
+        const defaultPasswordRecord = await buildPasswordRecord(bootstrapReceptionist.password);
+        await kv.set(`receptionist:${bootstrapReceptionist.id}`, {
+          id: bootstrapReceptionist.id,
+          name: bootstrapReceptionist.name,
+          username: bootstrapReceptionist.username,
+          passwordHash: defaultPasswordRecord.hash,
+          passwordSalt: defaultPasswordRecord.salt,
+          unitIds: bootstrapReceptionist.unitIds,
+          createdAt: new Date("2024-01-01").toISOString(),
+        });
+      } else {
+        console.warn(
+          "No bootstrap receptionist configured. Create reception users from the admin panel after the first admin login.",
+        );
+      }
     } else {
+      const bootstrapReceptionist = getBootstrapReceptionist();
       for (const receptionist of existingReceptionists) {
         const normalized: StoredReceptionist = {
           ...receptionist,
@@ -1264,13 +1330,29 @@ async function initializeDefaultData() {
         };
 
         let needsUpdate = normalized.unitIds !== receptionist.unitIds;
-        if (!normalized.passwordHash || !normalized.passwordSalt || normalized.password) {
-          const legacyPassword = normalized.password || "cbtea2024";
+        if (normalized.passwordHash && normalized.passwordSalt && !normalized.password) {
+          if (needsUpdate) {
+            await kv.set(`receptionist:${normalized.id}`, normalized);
+          }
+          continue;
+        }
+
+        const legacyPassword =
+          normalized.password ||
+          (bootstrapReceptionist?.username === normalized.username
+            ? bootstrapReceptionist.password
+            : "");
+
+        if (legacyPassword) {
           const passwordRecord = await buildPasswordRecord(legacyPassword);
           normalized.passwordHash = passwordRecord.hash;
           normalized.passwordSalt = passwordRecord.salt;
           delete normalized.password;
           needsUpdate = true;
+        } else {
+          console.warn(
+            `Receptionist ${normalized.username} has no valid password hash and could not be auto-migrated.`,
+          );
         }
 
         if (needsUpdate) {
@@ -1281,7 +1363,18 @@ async function initializeDefaultData() {
 
     const adminCredentials = await getStoredAdminCredentials();
     if (adminCredentials && (!adminCredentials.passwordHash || !adminCredentials.passwordSalt || adminCredentials.password)) {
-      const passwordRecord = await buildPasswordRecord(adminCredentials.password || "admin123");
+      const legacyPassword =
+        adminCredentials.password ||
+        (bootstrapAdmin?.username === adminCredentials.username ? bootstrapAdmin.password : "");
+
+      if (!legacyPassword) {
+        console.warn(
+          `Admin user ${adminCredentials.username} has no valid password hash and could not be auto-migrated.`,
+        );
+        return;
+      }
+
+      const passwordRecord = await buildPasswordRecord(legacyPassword);
       await kv.set("admin:credentials", {
         username: adminCredentials.username,
         passwordHash: passwordRecord.hash,
