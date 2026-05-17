@@ -1,12 +1,63 @@
 import { createBrowserRouter } from 'react-router';
 import type { ComponentType } from 'react';
+import AppRouteError from './components/AppRouteError';
 import RootLayout from './components/RootLayout';
+import QrCodeScreenV2 from './components/v2/QrCodeScreenV2';
+import QueuePositionScreenV2 from './components/v2/QueuePositionScreenV2';
+import RegisterScreenV2 from './components/v2/RegisterScreenV2';
+import WelcomeHome from './components/v2/WelcomeHome';
+
+const LAZY_ROUTE_RETRY_KEY = 'cbtea:lazy-route-retry';
+const DYNAMIC_IMPORT_ERROR_MARKERS = [
+  'Failed to fetch dynamically imported module',
+  'Importing a module script failed',
+  'error loading dynamically imported module',
+  'ChunkLoadError',
+];
+
+function isDynamicImportError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return DYNAMIC_IMPORT_ERROR_MARKERS.some((marker) => error.message.includes(marker));
+}
+
+async function loadLazyRouteModule<T>(loader: () => Promise<T>): Promise<T> {
+  try {
+    const module = await loader();
+
+    if (typeof window !== 'undefined') {
+      const currentPath = `${window.location.pathname}${window.location.search}`;
+      if (sessionStorage.getItem(LAZY_ROUTE_RETRY_KEY) === currentPath) {
+        sessionStorage.removeItem(LAZY_ROUTE_RETRY_KEY);
+      }
+    }
+
+    return module;
+  } catch (error) {
+    if (typeof window !== 'undefined' && isDynamicImportError(error)) {
+      const currentPath = `${window.location.pathname}${window.location.search}`;
+      const lastRetriedPath = sessionStorage.getItem(LAZY_ROUTE_RETRY_KEY);
+
+      if (lastRetriedPath !== currentPath) {
+        sessionStorage.setItem(LAZY_ROUTE_RETRY_KEY, currentPath);
+        window.location.reload();
+        return new Promise<T>(() => {});
+      }
+
+      sessionStorage.removeItem(LAZY_ROUTE_RETRY_KEY);
+    }
+
+    throw error;
+  }
+}
 
 const lazyComponent = <T extends { default: ComponentType<any> }>(
   loader: () => Promise<T>,
 ) => {
   return async () => {
-    const module = await loader();
+    const module = await loadLazyRouteModule(loader);
     return { Component: module.default };
   };
 };
@@ -14,18 +65,19 @@ const lazyComponent = <T extends { default: ComponentType<any> }>(
 export const router = createBrowserRouter([
   {
     Component: RootLayout,
+    errorElement: <AppRouteError />,
     children: [
       {
         path: '/',
-        lazy: lazyComponent(() => import('./components/v2/WelcomeHome')),
+        Component: WelcomeHome,
       },
       {
         path: '/qrcode',
-        lazy: lazyComponent(() => import('./components/v2/QrCodeScreenV2')),
+        Component: QrCodeScreenV2,
       },
       {
         path: '/fila',
-        lazy: lazyComponent(() => import('./components/v2/QueuePositionScreenV2')),
+        Component: QueuePositionScreenV2,
       },
       {
         path: '/login',
@@ -49,15 +101,15 @@ export const router = createBrowserRouter([
       },
       {
         path: '/:unitSlug/qrcode',
-        lazy: lazyComponent(() => import('./components/v2/QrCodeScreenV2')),
+        Component: QrCodeScreenV2,
       },
       {
         path: '/:unitSlug/fila',
-        lazy: lazyComponent(() => import('./components/v2/QueuePositionScreenV2')),
+        Component: QueuePositionScreenV2,
       },
       {
         path: '/:unitSlug',
-        lazy: lazyComponent(() => import('./components/v2/RegisterScreenV2')),
+        Component: RegisterScreenV2,
       },
     ],
   },

@@ -2,6 +2,74 @@
   "installCommand": "pnpm install --no-frozen-lockfile",
   "buildCommand": "pnpm build",
   "outputDirectory": "dist",
+  "headers": [
+    {
+      "source": "/",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/qrcode",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/fila",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/login",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/recepcao",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/log",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/admin",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/admin/:path*",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/:unitSlug/qrcode",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/:unitSlug/fila",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/:unitSlug",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" }
+      ]
+    }
+  ],
   "rewrites": [
     { "source": "/", "destination": "/index.html" },
     { "source": "/qrcode", "destination": "/index.html" },

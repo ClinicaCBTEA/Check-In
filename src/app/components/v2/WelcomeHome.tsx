@@ -2,6 +2,7 @@ import { Link } from 'react-router';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { useUserManagement } from '../../context/UserManagementContext';
+import { APP_NAME } from '../../branding';
 import { Building2, QrCode } from 'lucide-react';
 import logo from '../../../imports/image.png';
 
@@ -13,7 +14,7 @@ export default function WelcomeHome() {
       <div className="w-full max-w-lg space-y-6">
         <div className="text-center">
           <img src={logo} alt="CBTEA Logo" className="h-14 sm:h-16 mx-auto mb-4" />
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Check-in por unidade</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">{APP_NAME}</h1>
           <p className="text-gray-600 mt-2 text-sm sm:text-base">
             Escolha sua unidade para entrar na fila de atendimento.
           </p>
