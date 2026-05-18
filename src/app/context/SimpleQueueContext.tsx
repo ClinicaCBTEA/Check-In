@@ -1,4 +1,13 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import * as api from '../../utils/api';
 import { useAuth } from './AuthContext';
 
@@ -53,6 +62,24 @@ function parseQueueEntry(entry: api.QueueEntryDTO): QueueEntry {
   };
 }
 
+function sortQueueEntries(queueEntries: QueueEntry[]) {
+  return [...queueEntries].sort(
+    (left, right) => left.checkInTime.getTime() - right.checkInTime.getTime(),
+  );
+}
+
+function mergeQueueEntry(queueEntries: QueueEntry[], nextEntry: QueueEntry) {
+  const existingIndex = queueEntries.findIndex((entry) => entry.id === nextEntry.id);
+
+  if (existingIndex === -1) {
+    return sortQueueEntries([...queueEntries, nextEntry]);
+  }
+
+  const nextQueue = [...queueEntries];
+  nextQueue[existingIndex] = nextEntry;
+  return sortQueueEntries(nextQueue);
+}
+
 function deriveCurrentByUnit(queueEntries: QueueEntry[]) {
   const map: Record<string, QueueEntry | null> = {};
 
@@ -90,36 +117,72 @@ function firstCurrentPatient(map: Record<string, QueueEntry | null>): QueueEntry
 export function SimpleQueueProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, receptionistToken } = useAuth();
   const [queue, setQueue] = useState<QueueEntry[]>([]);
+  const refreshPromiseRef = useRef<Promise<void> | null>(null);
 
   const refreshQueue = useCallback(async () => {
     if (!isAuthenticated || !receptionistToken) {
+      refreshPromiseRef.current = null;
       setQueue([]);
       return;
     }
 
-    const queueData = await api.fetchQueue(receptionistToken);
-    const parsedQueue = queueData.map(parseQueueEntry);
-    parsedQueue.sort((left, right) => left.checkInTime.getTime() - right.checkInTime.getTime());
-    setQueue(parsedQueue);
+    if (refreshPromiseRef.current) {
+      return refreshPromiseRef.current;
+    }
+
+    const refreshPromise = (async () => {
+      const queueData = await api.fetchQueue(receptionistToken);
+      setQueue(sortQueueEntries(queueData.map(parseQueueEntry)));
+    })();
+
+    refreshPromiseRef.current = refreshPromise;
+
+    try {
+      await refreshPromise;
+    } finally {
+      if (refreshPromiseRef.current === refreshPromise) {
+        refreshPromiseRef.current = null;
+      }
+    }
   }, [isAuthenticated, receptionistToken]);
+
+  const syncQueueEntry = useCallback((entry: api.QueueEntryDTO) => {
+    const parsedEntry = parseQueueEntry(entry);
+    setQueue((currentQueue) => mergeQueueEntry(currentQueue, parsedEntry));
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated || !receptionistToken) {
+      refreshPromiseRef.current = null;
       setQueue([]);
       return;
     }
 
-    refreshQueue().catch((error) => {
-      console.error('Error fetching queue from server:', error);
-    });
+    const runRefresh = () => {
+      if (document.hidden) {
+        return;
+      }
 
-    const interval = window.setInterval(() => {
       refreshQueue().catch((error) => {
         console.error('Error refreshing queue:', error);
       });
-    }, 5000);
+    };
 
-    return () => window.clearInterval(interval);
+    runRefresh();
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        runRefresh();
+      }
+    };
+
+    const interval = window.setInterval(runRefresh, 5000);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [isAuthenticated, receptionistToken, refreshQueue]);
 
   const addToQueue = async (patientName: string, phone: string, unitId: string) => {
@@ -131,8 +194,8 @@ export function SimpleQueueProvider({ children }: { children: ReactNode }) {
       throw new Error('Reception session not available');
     }
 
-    await api.callNextPatient(receptionistName, unitId, receptionistToken);
-    await refreshQueue();
+    const updatedEntry = await api.callNextPatient(receptionistName, unitId, receptionistToken);
+    syncQueueEntry(updatedEntry);
   };
 
   const callSpecificPatient = async (patientId: string, receptionistName: string) => {
@@ -140,8 +203,8 @@ export function SimpleQueueProvider({ children }: { children: ReactNode }) {
       throw new Error('Reception session not available');
     }
 
-    await api.callSpecificPatient(patientId, receptionistName, receptionistToken);
-    await refreshQueue();
+    const updatedEntry = await api.callSpecificPatient(patientId, receptionistName, receptionistToken);
+    syncQueueEntry(updatedEntry);
   };
 
   const completeService = async (patientId: string) => {
@@ -149,8 +212,8 @@ export function SimpleQueueProvider({ children }: { children: ReactNode }) {
       throw new Error('Reception session not available');
     }
 
-    await api.completeQueueService(patientId, receptionistToken);
-    await refreshQueue();
+    const updatedEntry = await api.completeQueueService(patientId, receptionistToken);
+    syncQueueEntry(updatedEntry);
   };
 
   const returnToQueue = async (patientId: string) => {
@@ -158,8 +221,8 @@ export function SimpleQueueProvider({ children }: { children: ReactNode }) {
       throw new Error('Reception session not available');
     }
 
-    await api.returnQueueEntry(patientId, receptionistToken);
-    await refreshQueue();
+    const updatedEntry = await api.returnQueueEntry(patientId, receptionistToken);
+    syncQueueEntry(updatedEntry);
   };
 
   const moveToFront = async (patientId: string) => {
@@ -167,8 +230,8 @@ export function SimpleQueueProvider({ children }: { children: ReactNode }) {
       throw new Error('Reception session not available');
     }
 
-    await api.prioritizeQueueEntry(patientId, receptionistToken);
-    await refreshQueue();
+    const updatedEntry = await api.prioritizeQueueEntry(patientId, receptionistToken);
+    syncQueueEntry(updatedEntry);
   };
 
   const getPatientPosition = useCallback(
@@ -188,7 +251,7 @@ export function SimpleQueueProvider({ children }: { children: ReactNode }) {
   );
 
   const getLogEntries = useCallback(() => {
-    return [...queue].sort((left, right) => left.checkInTime.getTime() - right.checkInTime.getTime());
+    return sortQueueEntries(queue);
   }, [queue]);
 
   const currentByUnit = useMemo(() => deriveCurrentByUnit(queue), [queue]);

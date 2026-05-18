@@ -12,6 +12,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import {
+  getNotificationPermission,
   isNotificationSupported,
   playNotificationSound,
   requestNotificationPermission,
@@ -75,6 +76,7 @@ export default function QueuePositionScreenV2() {
   const [sessionIssue, setSessionIssue] = useState('');
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const previousStatusRef = useRef<string | null>(null);
+  const refreshInFlightRef = useRef(false);
 
   const restartPath = useMemo(() => {
     if (routeUnitSlug) {
@@ -120,9 +122,7 @@ export default function QueuePositionScreenV2() {
       return;
     }
 
-    requestNotificationPermission().then((permission) => {
-      setNotificationPermission(permission);
-    });
+    setNotificationPermission(getNotificationPermission());
   }, []);
 
   useEffect(() => {
@@ -134,6 +134,12 @@ export default function QueuePositionScreenV2() {
     setIsLoading(true);
 
     const refreshStatus = async () => {
+      if (refreshInFlightRef.current) {
+        return;
+      }
+
+      refreshInFlightRef.current = true;
+
       try {
         const nextStatus = await api.fetchPatientStatus(tracking.patientId, tracking.accessToken);
         if (!cancelled) {
@@ -160,6 +166,8 @@ export default function QueuePositionScreenV2() {
           setErrorMessage('N\u00E3o foi poss\u00EDvel atualizar sua posi\u00E7\u00E3o agora. Tentaremos novamente automaticamente.');
           setIsLoading(false);
         }
+      } finally {
+        refreshInFlightRef.current = false;
       }
     };
 

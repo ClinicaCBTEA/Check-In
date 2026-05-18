@@ -15,6 +15,7 @@ import {
 const app = new Hono();
 const FUNCTION_PREFIX = "/server";
 const RESERVED_SLUGS = new Set(["login", "recepcao", "fila", "qrcode", "log", "admin", "assets"]);
+const UNIT_SLUG_PREFIX = "unit-slug:";
 
 type QueueStatus = "waiting" | "in-service" | "completed";
 
@@ -222,6 +223,10 @@ function sortQueue(entries: StoredQueueEntry[]) {
   );
 }
 
+function getUnitSlugKey(slug: string) {
+  return `${UNIT_SLUG_PREFIX}${slug}`;
+}
+
 function getBearerToken(authorizationHeader?: string | null): string | null {
   if (!authorizationHeader) {
     return null;
@@ -265,6 +270,49 @@ async function getUnits() {
   const units = await kv.getByPrefix("unit:");
   units.sort((left: any, right: any) => (left.name || "").localeCompare(right.name || ""));
   return units;
+}
+
+async function storeUnitRecord(
+  unit: { id: string; slug: string; [key: string]: unknown },
+  previousSlug?: string,
+) {
+  await kv.set(`unit:${unit.id}`, unit);
+  await kv.set(getUnitSlugKey(unit.slug), unit.id);
+
+  if (previousSlug && previousSlug !== unit.slug) {
+    await kv.del(getUnitSlugKey(previousSlug));
+  }
+}
+
+async function getUnitBySlugOrId(slugOrId: string) {
+  const normalizedSlug = normalizeSlug(slugOrId);
+  const unitId = await kv.get(getUnitSlugKey(normalizedSlug));
+
+  if (typeof unitId === "string") {
+    const unit = await kv.get(`unit:${unitId}`);
+    if (unit) {
+      return unit;
+    }
+
+    await kv.del(getUnitSlugKey(normalizedSlug));
+  }
+
+  const directUnit = await kv.get(`unit:${normalizedSlug}`);
+  if (directUnit) {
+    if (directUnit.slug) {
+      await kv.set(getUnitSlugKey(directUnit.slug), directUnit.id);
+    }
+    return directUnit;
+  }
+
+  const units = await getUnits();
+  const unit = units.find((record: any) => record.slug === normalizedSlug || record.id === slugOrId);
+
+  if (unit?.slug && unit?.id) {
+    await kv.set(getUnitSlugKey(unit.slug), unit.id);
+  }
+
+  return unit || null;
 }
 
 async function unitExists(unitId: string): Promise<boolean> {
@@ -405,8 +453,15 @@ async function getActivePatientForUnit(unitId: string) {
   return queueEntries.find((entry) => entry.unitId === unitId && entry.status === "in-service") || null;
 }
 
-async function callPatient(entry: StoredQueueEntry, receptionistName: string) {
-  const activePatient = await getActivePatientForUnit(entry.unitId);
+async function callPatient(
+  entry: StoredQueueEntry,
+  receptionistName: string,
+  activePatientOverride?: StoredQueueEntry | null,
+) {
+  const activePatient =
+    activePatientOverride === undefined
+      ? await getActivePatientForUnit(entry.unitId)
+      : activePatientOverride;
   if (activePatient && activePatient.id !== entry.id) {
     throw new Error("There is already a patient in service for this unit");
   }
@@ -773,7 +828,11 @@ app.post(`${FUNCTION_PREFIX}/queue/call-next`, async (c) =>
         return c.json({ success: false, error: "Forbidden for this unit" }, 403);
       }
 
-      const activePatient = await getActivePatientForUnit(unitId);
+      const queueEntries = await getQueueEntries();
+      const activePatient =
+        queueEntries.find(
+          (entry) => entry.unitId === unitId && entry.status === "in-service",
+        ) || null;
       if (activePatient) {
         return c.json(
           { success: false, error: "There is already a patient in service for this unit" },
@@ -781,7 +840,6 @@ app.post(`${FUNCTION_PREFIX}/queue/call-next`, async (c) =>
         );
       }
 
-      const queueEntries = await getQueueEntries();
       const nextPatient = queueEntries.find(
         (entry) => entry.unitId === unitId && entry.status === "waiting",
       );
@@ -790,7 +848,7 @@ app.post(`${FUNCTION_PREFIX}/queue/call-next`, async (c) =>
         return c.json({ success: false, error: "No waiting patients for this unit" }, 404);
       }
 
-      const updatedEntry = await callPatient(nextPatient, receptionistName);
+      const updatedEntry = await callPatient(nextPatient, receptionistName, activePatient);
       return c.json({ success: true, data: updatedEntry });
     } catch (error) {
       console.error("Error calling next patient:", error);
@@ -1070,9 +1128,8 @@ app.get(`${FUNCTION_PREFIX}/units`, async (c) => {
 
 app.get(`${FUNCTION_PREFIX}/units/by-slug/:slug`, async (c) => {
   try {
-    const slug = normalizeSlug(c.req.param("slug"));
-    const units = await getUnits();
-    const unit = units.find((record: any) => record.slug === slug || record.id === slug);
+    const slug = c.req.param("slug");
+    const unit = await getUnitBySlugOrId(slug);
     if (!unit) {
       return c.json({ success: false, error: "Unit not found" }, 404);
     }
@@ -1120,7 +1177,7 @@ app.post(`${FUNCTION_PREFIX}/units`, async (c) =>
         createdAt: new Date().toISOString(),
       };
 
-      await kv.set(`unit:${id}`, unit);
+      await storeUnitRecord(unit);
       return c.json({ success: true, data: unit });
     } catch (error) {
       console.error("Error creating unit:", error);
@@ -1164,7 +1221,7 @@ app.put(`${FUNCTION_PREFIX}/units/:id`, async (c) =>
             : existing.address,
       };
 
-      await kv.set(`unit:${id}`, updatedUnit);
+      await storeUnitRecord(updatedUnit, existing.slug);
       return c.json({ success: true, data: updatedUnit });
     } catch (error) {
       console.error("Error updating unit:", error);
@@ -1203,6 +1260,7 @@ app.delete(`${FUNCTION_PREFIX}/units/:id`, async (c) =>
         );
       }
 
+      await kv.del(getUnitSlugKey(unit.slug));
       await kv.del(`unit:${id}`);
       return c.json({ success: true });
     } catch (error) {
@@ -1280,7 +1338,13 @@ async function initializeDefaultData() {
     const existingUnits = await getUnits();
     if (existingUnits.length === 0) {
       for (const unit of defaultUnits) {
-        await kv.set(`unit:${unit.id}`, unit);
+        await storeUnitRecord(unit);
+      }
+    } else {
+      for (const unit of existingUnits) {
+        if (unit?.slug && unit?.id) {
+          await kv.set(getUnitSlugKey(unit.slug), unit.id);
+        }
       }
     }
 

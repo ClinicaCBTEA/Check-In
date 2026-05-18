@@ -1,51 +1,100 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, AlertDescription } from './ui/alert';
 import { Wifi, WifiOff } from 'lucide-react';
 import { projectId, publishableKey } from '/utils/supabase/info';
 
 const IS_PROD = import.meta.env.PROD;
+const CONNECTION_CHECK_INTERVAL_MS = IS_PROD ? 60000 : 15000;
 
 export function ConnectionStatus() {
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [isChecking, setIsChecking] = useState(true);
+  const isCheckingRef = useRef(false);
 
   useEffect(() => {
-    checkConnection();
+    let mounted = true;
 
-    const interval = setInterval(checkConnection, 15000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const checkConnection = async () => {
-    try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/server/health`,
-        {
-          method: 'GET',
-          headers: {
-            apikey: publishableKey,
-          },
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        const isOk = data.status === 'ok';
-        setIsConnected(isOk);
-
-        if (!IS_PROD && isOk && data.version && data.version !== '3.0') {
-          console.warn('Server version mismatch. Please redeploy the Edge Function.');
-        }
-      } else {
-        setIsConnected(false);
+    const checkConnection = async () => {
+      if (isCheckingRef.current || document.hidden) {
+        return;
       }
-    } catch {
+
+      isCheckingRef.current = true;
+
+      try {
+        const response = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/server/health`,
+          {
+            method: 'GET',
+            headers: {
+              apikey: publishableKey,
+            },
+          }
+        );
+
+        if (!mounted) {
+          return;
+        }
+
+        if (response.ok) {
+          const data = await response.json();
+          const isOk = data.status === 'ok';
+          setIsConnected(isOk);
+
+          if (!IS_PROD && isOk && data.version && data.version !== '3.0') {
+            console.warn('Server version mismatch. Please redeploy the Edge Function.');
+          }
+        } else {
+          setIsConnected(false);
+        }
+      } catch {
+        if (!mounted) {
+          return;
+        }
+
+        setIsConnected(false);
+      } finally {
+        if (mounted) {
+          setIsChecking(false);
+        }
+
+        isCheckingRef.current = false;
+      }
+    };
+
+    const handleOnline = () => {
+      void checkConnection();
+    };
+
+    const handleOffline = () => {
       setIsConnected(false);
-    } finally {
       setIsChecking(false);
-    }
-  };
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        void checkConnection();
+      }
+    };
+
+    void checkConnection();
+
+    const interval = window.setInterval(() => {
+      void checkConnection();
+    }, CONNECTION_CHECK_INTERVAL_MS);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      mounted = false;
+      window.clearInterval(interval);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   if (isChecking) {
     return null;
