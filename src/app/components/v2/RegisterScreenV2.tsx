@@ -179,7 +179,7 @@ export default function RegisterScreenV2() {
                 <span className="text-sm sm:text-base">Entrar na Fila</span>
               )}
             </Button>
-            <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-center text-xs sm:text-sm text-blue-900">
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center text-xs sm:text-sm text-red-900">
               <p className="font-semibold">Mantenha esta tela aberta at&eacute; a conclus&atilde;o do atendimento.</p>
               <p className="mt-1 text-blue-800">O aviso da sua vez aparecer&aacute; aqui e na pr&oacute;xima tela de acompanhamento.</p>
             </div>
