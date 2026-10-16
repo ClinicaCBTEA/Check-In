@@ -7,7 +7,7 @@ CREATE TABLE kv_store_d5bb9c63 (
 );
 */
 
-// View at https://supabase.com/dashboard/project/ziuhtwnermhsjoirtdzy/database/tables
+// View at https://supabase.com/dashboard/project/vfcneroahkdbeszcjiwk/database/tables
 
 // This file provides a simple key-value interface for storing Figma Make data. It should be adequate for most small-scale use cases.
 import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
@@ -52,6 +52,8 @@ const supabase = createClient(supabaseUrl, getSecretKey(), {
     detectSessionInUrl: false,
   },
 });
+
+const PREFIX_QUERY_PAGE_SIZE = 500;
 
 // Set stores a key-value pair in the database.
 export const set = async (key: string, value: any): Promise<void> => {
@@ -108,9 +110,37 @@ export const mdel = async (keys: string[]): Promise<void> => {
 
 // Search for key-value pairs by prefix.
 export const getByPrefix = async (prefix: string): Promise<any[]> => {
-  const { data, error } = await supabase.from("kv_store_d5bb9c63").select("key, value").like("key", prefix + "%");
-  if (error) {
-    throw new Error(error.message);
+  const records: Array<{ key: string; value: any }> = [];
+  let lastKey: string | null = null;
+
+  while (true) {
+    let query = supabase
+      .from("kv_store_d5bb9c63")
+      .select("key, value")
+      .like("key", `${prefix}%`)
+      .order("key", { ascending: true })
+      .limit(PREFIX_QUERY_PAGE_SIZE);
+
+    if (lastKey) {
+      query = query.gt("key", lastKey);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!data?.length) {
+      break;
+    }
+
+    records.push(...data);
+    const nextLastKey = data[data.length - 1].key;
+    if (nextLastKey === lastKey) {
+      throw new Error("KV prefix pagination did not advance.");
+    }
+    lastKey = nextLastKey;
   }
-  return data?.map((d) => d.value) ?? [];
+
+  return records.map((record) => record.value);
 };

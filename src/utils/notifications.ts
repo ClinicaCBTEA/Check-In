@@ -11,8 +11,12 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
   }
 
   if (Notification.permission !== 'denied') {
-    const permission = await Notification.requestPermission();
-    return permission;
+    try {
+      return await Notification.requestPermission();
+    } catch (error) {
+      console.warn('Failed to request notification permission:', error);
+      return Notification.permission;
+    }
   }
 
   return Notification.permission;

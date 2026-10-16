@@ -33,6 +33,8 @@ export interface QueueEntry {
 
 interface SimpleQueueContextType {
   queue: QueueEntry[];
+  isQueueLoaded: boolean;
+  queueRefreshError: string | null;
   currentPatient: QueueEntry | null;
   currentByUnit: Record<string, QueueEntry | null>;
   addToQueue: (patientName: string, phone: string, unitId: string) => Promise<{ id: string; accessToken: string; unitId: string }>;
@@ -117,12 +119,16 @@ function firstCurrentPatient(map: Record<string, QueueEntry | null>): QueueEntry
 export function SimpleQueueProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, receptionistToken } = useAuth();
   const [queue, setQueue] = useState<QueueEntry[]>([]);
+  const [isQueueLoaded, setIsQueueLoaded] = useState(false);
+  const [queueRefreshError, setQueueRefreshError] = useState<string | null>(null);
   const refreshPromiseRef = useRef<Promise<void> | null>(null);
 
   const refreshQueue = useCallback(async () => {
     if (!isAuthenticated || !receptionistToken) {
       refreshPromiseRef.current = null;
       setQueue([]);
+      setIsQueueLoaded(false);
+      setQueueRefreshError(null);
       return;
     }
 
@@ -131,8 +137,15 @@ export function SimpleQueueProvider({ children }: { children: ReactNode }) {
     }
 
     const refreshPromise = (async () => {
-      const queueData = await api.fetchQueue(receptionistToken);
-      setQueue(sortQueueEntries(queueData.map(parseQueueEntry)));
+      try {
+        const queueData = await api.fetchQueue(receptionistToken);
+        setQueue(sortQueueEntries(queueData.map(parseQueueEntry)));
+        setIsQueueLoaded(true);
+        setQueueRefreshError(null);
+      } catch (error) {
+        setQueueRefreshError(error instanceof Error ? error.message : 'Falha ao atualizar a fila.');
+        throw error;
+      }
     })();
 
     refreshPromiseRef.current = refreshPromise;
@@ -155,14 +168,12 @@ export function SimpleQueueProvider({ children }: { children: ReactNode }) {
     if (!isAuthenticated || !receptionistToken) {
       refreshPromiseRef.current = null;
       setQueue([]);
+      setIsQueueLoaded(false);
+      setQueueRefreshError(null);
       return;
     }
 
     const runRefresh = () => {
-      if (document.hidden) {
-        return;
-      }
-
       refreshQueue().catch((error) => {
         console.error('Error refreshing queue:', error);
       });
@@ -170,11 +181,7 @@ export function SimpleQueueProvider({ children }: { children: ReactNode }) {
 
     runRefresh();
 
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        runRefresh();
-      }
-    };
+    const handleVisibilityChange = () => runRefresh();
 
     const interval = window.setInterval(runRefresh, 5000);
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -261,6 +268,8 @@ export function SimpleQueueProvider({ children }: { children: ReactNode }) {
     <SimpleQueueContext.Provider
       value={{
         queue,
+        isQueueLoaded,
+        queueRefreshError,
         currentPatient,
         currentByUnit,
         addToQueue,

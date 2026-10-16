@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
@@ -17,17 +17,39 @@ import {
   RotateCcw,
   CheckCircle,
   AlertCircle,
+  BellRing,
 } from 'lucide-react';
 import ProtectedRoute from './ProtectedRoute';
 import logo from '../../../imports/image.png';
+import {
+  getNotificationPermission,
+  isNotificationSupported,
+  playNotificationSound,
+  requestNotificationPermission,
+  showNotification,
+} from '../../../utils/notifications';
 
 function ReceptionScreenContent() {
-  const { queue, callNext, callSpecificPatient, completeService, returnToQueue, moveToFront } = useSimpleQueue();
+  const {
+    queue,
+    isQueueLoaded,
+    queueRefreshError,
+    refreshQueue,
+    callNext,
+    callSpecificPatient,
+    completeService,
+    returnToQueue,
+    moveToFront,
+  } = useSimpleQueue();
   const { logoutReceptionist, currentUser, receptionist } = useAuth();
   const { units } = useUserManagement();
   const navigate = useNavigate();
   const [selectedUnitId, setSelectedUnitId] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
+    () => getNotificationPermission(),
+  );
+  const knownQueueIdsRef = useRef<Set<string> | null>(null);
 
   const allowedUnits = useMemo(() => {
     if (!receptionist?.unitIds?.length) {
@@ -42,6 +64,40 @@ function ReceptionScreenContent() {
       setSelectedUnitId(allowedUnits[0].id);
     }
   }, [allowedUnits, selectedUnitId]);
+
+  useEffect(() => {
+    if (!isQueueLoaded) {
+      knownQueueIdsRef.current = null;
+      return;
+    }
+
+    const waitingEntries = queue.filter((entry) => entry.status === 'waiting');
+    if (knownQueueIdsRef.current === null) {
+      knownQueueIdsRef.current = new Set(queue.map((entry) => entry.id));
+      return;
+    }
+
+    const knownIds = knownQueueIdsRef.current;
+    const newCheckIns = waitingEntries.filter((entry) => !knownIds.has(entry.id));
+    knownQueueIdsRef.current = new Set(queue.map((entry) => entry.id));
+
+    if (newCheckIns.length === 0) {
+      return;
+    }
+
+    playNotificationSound();
+    if (notificationPermission === 'granted') {
+      const unitNames = [...new Set(newCheckIns.map((entry) => unitLabel(entry.unitId)))];
+      const unitSummary = unitNames.length === 1 ? unitNames[0] : `${unitNames.length} unidades`;
+      const patientSummary = newCheckIns.length === 1 ? '1 novo check-in' : `${newCheckIns.length} novos check-ins`;
+      void showNotification(patientSummary, {
+        body: `${unitSummary}. Abra o painel para ver a fila.`,
+        tag: 'cbtea-new-checkin',
+        renotify: true,
+        icon: logo,
+      });
+    }
+  }, [isQueueLoaded, notificationPermission, queue, units]);
 
   const unitLabel = (id: string) => units.find((unit) => unit.id === id)?.name || id;
 
@@ -141,6 +197,51 @@ function ReceptionScreenContent() {
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{errorMessage}</AlertDescription>
           </Alert>
+        )}
+
+        {queueRefreshError && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+              <span>Não foi possível atualizar a fila: {queueRefreshError}</span>
+              <Button type="button" size="sm" variant="outline" onClick={() => refreshQueue().catch(() => undefined)}>
+                Tentar novamente
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {isNotificationSupported() && notificationPermission !== 'granted' && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950">
+            <div>
+              <p className="font-semibold">Avisos de novos check-ins</p>
+              <p className="text-sm">
+                {notificationPermission === 'denied'
+                  ? 'As notificações estão bloqueadas nas permissões deste site. Libere-as nas configurações do navegador.'
+                  : 'Ative as notificações deste site para receber um aviso quando chegar um novo paciente.'}
+              </p>
+            </div>
+            {notificationPermission !== 'denied' && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={async () => {
+                  const permission = await requestNotificationPermission();
+                  setNotificationPermission(permission);
+                }}
+              >
+                <BellRing className="mr-2 h-4 w-4" />
+                Ativar notificações
+              </Button>
+            )}
+          </div>
+        )}
+
+        {isNotificationSupported() && notificationPermission === 'granted' && (
+          <div className="flex items-center gap-2 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-900">
+            <BellRing className="h-4 w-4 shrink-0" />
+            <span>Alertas de novos check-ins ativados neste navegador.</span>
+          </div>
         )}
 
         <div className="grid md:grid-cols-4 gap-4">

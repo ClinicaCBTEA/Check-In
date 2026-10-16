@@ -7,7 +7,7 @@ Sistema web completo para gerenciamento de fila de atendimento com notificaçõe
 ### Para Pacientes
 - ✅ Cadastro na fila via QR Code
 - 📱 Acompanhamento da posição em tempo real
-- 🔔 Notificações push quando chegar a vez
+- 🔔 Notificação no navegador quando chegar a vez (com a página de acompanhamento aberta)
 - 🔊 Alerta sonoro automático
 - 📳 Vibração em dispositivos móveis
 - ✨ Título da aba piscando quando chamado
@@ -15,6 +15,7 @@ Sistema web completo para gerenciamento de fila de atendimento com notificaçõe
 
 ### Para Recepção
 - 👥 Painel de gerenciamento de pacientes
+- 🔔 Aviso de novo check-in no painel da recepção
 - 🎯 Chamada do próximo paciente ou específico
 - 📊 Visualização de status (Aguardando, Em Atendimento, Concluídos)
 - ✅ Conclusão de atendimento
@@ -47,10 +48,8 @@ Sistema web completo para gerenciamento de fila de atendimento com notificaçõe
   - Storage (se necessário)
 
 ### APIs Web
-- Notifications API - Push notifications
+- Notifications API - Alertas locais no navegador
 - Web Audio API - Sons de alerta
-- Vibration API - Vibração mobile
-- Service Worker API - Notificações em background
 
 ## 📦 Instalação
 
@@ -143,17 +142,9 @@ A aplicação estará disponível em `http://localhost:5173`
 └── DEPLOY.md                    # Guia de deploy
 ```
 
-## 🔐 Credenciais Padrão
+## 🔐 Credenciais Iniciais
 
-### Recepção
-- **Usuário:** `recepcao`
-- **Senha:** `cbtea2024`
-
-### Administrador
-- **Usuário:** `admin`
-- **Senha:** `admin123`
-
-⚠️ **IMPORTANTE:** Altere essas credenciais em produção através do painel administrativo!
+Configure as credenciais iniciais `DEFAULT_ADMIN_USERNAME`, `DEFAULT_ADMIN_PASSWORD`, `DEFAULT_RECEPTION_USERNAME` e `DEFAULT_RECEPTION_PASSWORD` nos secrets da Edge Function do Supabase antes do primeiro acesso. Depois, gerencie as contas pelo painel administrativo. Não use credenciais padrão ou compartilhadas em produção.
 
 ## 🌐 Deploy em Produção
 

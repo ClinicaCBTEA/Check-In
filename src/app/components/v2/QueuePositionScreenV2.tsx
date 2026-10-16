@@ -227,6 +227,7 @@ export default function QueuePositionScreenV2() {
   const isCompleted = status?.status === 'completed';
   const position = status?.position ?? null;
   const totalWaiting = status?.totalWaiting ?? 0;
+  const isWaitingPositionMissing = status?.status === 'waiting' && position === null;
 
   const handleReturnToQueue = async () => {
     if (!tracking) {
@@ -304,6 +305,12 @@ export default function QueuePositionScreenV2() {
             </div>
           )}
 
+          {isWaitingPositionMissing && (
+            <div role="alert" className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Não foi possível sincronizar sua posição agora. Estamos tentando novamente; se a mensagem persistir, informe a recepção.
+            </div>
+          )}
+
           {isCompleted ? (
             <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-12 text-center border-4 sm:border-8 border-blue-500">
               <div className="bg-blue-100 rounded-full w-20 h-20 sm:w-32 sm:h-32 mx-auto mb-4 sm:mb-6 flex items-center justify-center">
@@ -360,7 +367,9 @@ export default function QueuePositionScreenV2() {
                   <div className="flex items-center justify-center gap-2 sm:gap-3 mb-2 flex-wrap">
                     <Bell className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-700" />
                     <p className="text-base sm:text-lg md:text-xl font-semibold text-emerald-900">
-                      {totalWaiting} {totalWaiting === 1 ? 'pessoa' : 'pessoas'} aguardando nesta unidade
+                      {isWaitingPositionMissing
+                        ? 'Sincronizando sua posição...'
+                        : `${totalWaiting} ${totalWaiting === 1 ? 'pessoa' : 'pessoas'} aguardando nesta unidade`}
                     </p>
                   </div>
                   <p className="text-xs sm:text-sm text-emerald-700">Aguardando atendimento</p>
